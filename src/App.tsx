@@ -38,15 +38,22 @@ const stageOrder = [
 ];
 
 function App() {
-  const [route, setRoute] = useState(window.location.hash);
+  const isDashboardRoute = () =>
+    window.location.hash.startsWith("#dashboard") ||
+    new URLSearchParams(window.location.search).get("auth") === "dashboard";
+  const [showDashboard, setShowDashboard] = useState(isDashboardRoute);
 
   useEffect(() => {
-    const onHashChange = () => setRoute(window.location.hash);
-    window.addEventListener("hashchange", onHashChange);
-    return () => window.removeEventListener("hashchange", onHashChange);
+    const onLocationChange = () => setShowDashboard(isDashboardRoute());
+    window.addEventListener("hashchange", onLocationChange);
+    window.addEventListener("popstate", onLocationChange);
+    return () => {
+      window.removeEventListener("hashchange", onLocationChange);
+      window.removeEventListener("popstate", onLocationChange);
+    };
   }, []);
 
-  return route.startsWith("#dashboard") ? <Dashboard /> : <Portfolio />;
+  return showDashboard ? <Dashboard /> : <Portfolio />;
 }
 
 function Portfolio() {
@@ -241,12 +248,23 @@ function Dashboard() {
       return;
     }
 
-    void supabase.auth.getSession().then(({ data }) => {
+    const finishAuthCallback = () => {
+      if (new URLSearchParams(window.location.search).get("auth") === "dashboard") {
+        window.history.replaceState(null, "", `${window.location.pathname}#dashboard`);
+      }
+    };
+    const callbackError = new URLSearchParams(window.location.hash.slice(1)).get("error_description");
+    if (callbackError) setMessage(callbackError);
+
+    void supabase.auth.getSession().then(({ data, error }) => {
       setSession(data.session);
+      if (error) setMessage(error.message);
+      if (data.session) finishAuthCallback();
       setLoading(false);
     });
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
+      if (nextSession) finishAuthCallback();
     });
     return () => data.subscription.unsubscribe();
   }, []);
@@ -280,10 +298,16 @@ function Dashboard() {
   async function sendMagicLink(event: FormEvent) {
     event.preventDefault();
     if (!supabase) return;
+    if (email.trim().toLowerCase() !== profile.email.toLowerCase()) {
+      setMessage("This dashboard is restricted to the owner email address.");
+      return;
+    }
     setMessage("Sending secure sign-in link…");
     const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: `${window.location.origin}${window.location.pathname}#dashboard` },
+      email: email.trim(),
+      options: {
+        emailRedirectTo: `${window.location.origin}${window.location.pathname}?auth=dashboard`,
+      },
     });
     setMessage(error ? error.message : "Check your email for the secure sign-in link.");
   }
