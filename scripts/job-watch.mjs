@@ -93,10 +93,10 @@ export function parseListings(markdown) {
 
 async function saveNewMatches(listings) {
   const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const secretKey = process.env.SUPABASE_SECRET_KEY;
   const ownerId = process.env.OWNER_USER_ID;
 
-  if (!supabaseUrl || !serviceKey || !ownerId) {
+  if (!supabaseUrl || !secretKey || !ownerId) {
     console.log("Private backend secrets are not configured; discovery completed in dry-run mode.");
     return listings;
   }
@@ -105,8 +105,7 @@ async function saveNewMatches(listings) {
   const response = await fetch(`${supabaseUrl}/rest/v1/job_matches?on_conflict=owner_id,external_id`, {
     method: "POST",
     headers: {
-      apikey: serviceKey,
-      Authorization: `Bearer ${serviceKey}`,
+      apikey: secretKey,
       "Content-Type": "application/json",
       Prefer: "return=representation,resolution=ignore-duplicates",
     },

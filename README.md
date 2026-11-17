@@ -26,7 +26,7 @@ It activates after these repository secrets are configured:
 
 ```text
 SUPABASE_URL
-SUPABASE_SERVICE_ROLE_KEY
+SUPABASE_SECRET_KEY
 OWNER_USER_ID
 DISCORD_WEBHOOK_URL
 ```

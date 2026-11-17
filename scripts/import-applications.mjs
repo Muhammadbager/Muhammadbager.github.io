@@ -5,7 +5,7 @@ const sourcePath = process.argv[2];
 if (!sourcePath) throw new Error("Usage: node scripts/import-applications.mjs <tracker.csv>");
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const secretKey = process.env.SUPABASE_SECRET_KEY;
 const ownerId = process.env.OWNER_USER_ID;
 
 function toIsoDate(value) {
@@ -42,7 +42,7 @@ const applications = records
     notes: row["Additional Notes"] || null,
   }));
 
-if (!supabaseUrl || !serviceKey || !ownerId) {
+if (!supabaseUrl || !secretKey || !ownerId) {
   console.log(`Parsed ${applications.length} application records in dry-run mode; no private data was uploaded.`);
   process.exit(0);
 }
@@ -50,8 +50,7 @@ if (!supabaseUrl || !serviceKey || !ownerId) {
 const response = await fetch(`${supabaseUrl}/rest/v1/applications`, {
   method: "POST",
   headers: {
-    apikey: serviceKey,
-    Authorization: `Bearer ${serviceKey}`,
+    apikey: secretKey,
     "Content-Type": "application/json",
     Prefer: "return=representation",
   },
