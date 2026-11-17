@@ -11,13 +11,13 @@ export const profile = {
 export const experience = [
   {
     period: "Oct 2025 — Jun 2026",
-    role: "Full Stack Engineer",
+    role: "Backend Engineer",
     organization: "Husky Coding Project",
     summary:
-      "Built backend services and product infrastructure for Topical, an educational content app with LLM-powered recommendations.",
+      "Built FastAPI and Supabase services for an AI-assisted research app that processes and summarizes academic papers.",
     details: [
-      "Developed REST APIs with FastAPI and PostgreSQL for user interaction and recommendation data.",
-      "Collaborated across frontend and ML workstreams to connect React experiences with recommendation pipelines.",
+      "Architected nine REST endpoints and bulk metadata operations for up to 25 research papers per request.",
+      "Connected a React Native client with arXiv ingestion, PDF image extraction, and multiple LLM providers.",
     ],
   },
   {

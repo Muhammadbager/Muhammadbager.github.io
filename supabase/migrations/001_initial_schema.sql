@@ -45,6 +45,7 @@ create table public.job_matches (
   url text not null,
   posted_at timestamptz,
   discovered_at timestamptz not null default now(),
+  source text not null default 'Simplify New Grad Positions',
   is_wishlist boolean not null default false,
   status text not null default 'new',
   unique (owner_id, external_id)
