@@ -164,41 +164,31 @@ function Portfolio() {
             </a>
           </div>
           <div className="project-list">
-            {projects.map((project) => {
-              const content = (
-                <>
-                  <span className="project-index">{project.index}</span>
-                  <div className="project-main">
-                    <p className="project-type">{project.type}</p>
-                    <h3>{project.title}</h3>
-                    <p>{project.description}</p>
-                    <ul className="tool-list">
-                      {project.tools.map((tool) => <li key={tool}>{tool}</li>)}
-                    </ul>
-                    {"availability" in project && project.availability && (
-                      <p className="project-availability">{project.availability}</p>
-                    )}
-                  </div>
-                  {project.href && <ArrowUpRight className="project-arrow" />}
-                </>
-              );
-
-              return project.href ? (
-                <a
-                  className="project-card"
-                  href={project.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  key={project.title}
-                >
-                  {content}
-                </a>
-              ) : (
-                <article className="project-card project-card-static" key={project.title}>
-                  {content}
-                </article>
-              );
-            })}
+            {projects.map((project) => (
+              <article className="project-card" key={project.title}>
+                <span className="project-index">{project.index}</span>
+                <div className="project-main">
+                  <p className="project-type">{project.type}</p>
+                  <h3>{project.title}</h3>
+                  <p>{project.description}</p>
+                  <ul className="tool-list">
+                    {project.tools.map((tool) => <li key={tool}>{tool}</li>)}
+                  </ul>
+                  {project.links.length > 0 && (
+                    <div className="project-links" aria-label={`${project.title} links`}>
+                      {project.links.map((link) => (
+                        <a href={link.href} target="_blank" rel="noreferrer" key={link.label}>
+                          {link.label} <ArrowUpRight size={14} />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  {"availability" in project && project.availability && (
+                    <p className="project-availability">{project.availability}</p>
+                  )}
+                </div>
+              </article>
+            ))}
           </div>
         </section>
 

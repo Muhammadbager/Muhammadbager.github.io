@@ -28,7 +28,7 @@ export const experience = [
       "Evaluated physics-informed neural operators across wave-equation and Black–Scholes experiments.",
     details: [
       "Tested zero-shot super-resolution across training resolutions and PDE evaluation grids.",
-      "Built analytical data-generation and PyTorch training workflows for controlled experiments.",
+      "Built a Crank–Nicolson data generator, Yahoo Finance options pipeline, and masked sparse-data loss for Black–Scholes experiments.",
     ],
   },
 ];
@@ -41,17 +41,23 @@ export const projects = [
     description:
       "A hands-free navigation copilot for Raspberry Pi with on-device language understanding, speech, routing, and resilient GPS fallbacks.",
     tools: ["Python", "Flask", "Raspberry Pi", "Gemma", "OSRM"],
-    href: "https://github.com/aryank09/Dubhacks_25_T-Mobile",
+    links: [
+      { label: "Code", href: "https://github.com/aryank09/Dubhacks_25_T-Mobile" },
+      { label: "Presentation", href: "https://www.canva.com/design/DAG2NXKM7MI/sZyGksvAPrxJ8DEA5sqSPw/view?utlId=h192cf142bd" },
+      { label: "Demo", href: "https://www.youtube.com/watch?v=DKR2-e1kkLI" },
+    ],
   },
   {
     index: "02",
-    title: "SkillSnap",
-    type: "Full-stack product",
+    title: "PINO Robustness",
+    type: "Machine learning research",
     description:
-      "A portfolio platform with relational project and skill models, secure identity flows, and a polished Blazor interface.",
-    tools: ["ASP.NET Core", "Blazor", "EF Core", "SQLite", "JWT"],
-    href: null,
-    availability: "Repository available on request",
+      "Stress-tested physics-informed neural operators across 1D wave super-resolution and Black–Scholes experiments with sparse real-world options data.",
+    tools: ["PyTorch", "Jupyter", "PINO", "Black–Scholes", "Yahoo Finance"],
+    links: [
+      { label: "Code", href: "https://github.com/hishambhatti/PINO-apps" },
+      { label: "Paper", href: "/research/PINO_Robustness_Paper.pdf" },
+    ],
   },
   {
     index: "03",
@@ -60,16 +66,30 @@ export const projects = [
     description:
       "A multilingual character n-gram model with Kneser–Ney smoothing trained on more than 20 million characters.",
     tools: ["Python", "Kneser–Ney", "Docker", "NLP"],
-    href: "https://github.com/pemap654/cse447-project",
+    links: [
+      { label: "Code", href: "https://github.com/pemap654/cse447-project" },
+    ],
   },
   {
     index: "04",
+    title: "Topical",
+    type: "AI research discovery",
+    description:
+      "A mobile research discovery app that turns academic papers into approachable summaries with personalized feeds, search, and source links.",
+    tools: ["FastAPI", "Supabase", "React Native", "LLM APIs", "arXiv"],
+    links: [
+      { label: "Code", href: "https://github.com/hcp-uw/topical" },
+    ],
+    availability: "Archived codebase — Railway deployment offline",
+  },
+  {
+    index: "05",
     title: "CampusMaps Friends",
     type: "Software design",
     description:
       "Friend-management APIs, spatial search utilities, and React components for viewing nearby friends and routes.",
     tools: ["React", "TypeScript", "Node.js", "Spatial search"],
-    href: null,
+    links: [],
     availability: "Course project — source available on request",
   },
 ];
