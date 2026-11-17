@@ -60,8 +60,7 @@ export const projects = [
     description:
       "A multilingual character n-gram model with Kneser–Ney smoothing trained on more than 20 million characters.",
     tools: ["Python", "Kneser–Ney", "Docker", "NLP"],
-    href: null,
-    availability: "Project details available on request",
+    href: "https://github.com/pemap654/cse447-project",
   },
   {
     index: "04",
