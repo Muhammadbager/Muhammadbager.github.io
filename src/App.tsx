@@ -777,7 +777,7 @@ function Dashboard() {
                 id="wishlist-company"
                 value={wishlistInput}
                 onChange={(event) => setWishlistInput(event.target.value)}
-                placeholder="Microsoft, Airbnb, Nvidia…"
+                placeholder="Company name"
               />
               <button className="secondary-button" type="submit"><Plus size={15} /> Add</button>
             </div>
