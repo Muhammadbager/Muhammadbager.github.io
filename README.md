@@ -20,7 +20,9 @@ Private application records and resume source files are intentionally excluded f
 
 ## Job discovery
 
-The `Greater Seattle Job Watch` workflow runs at 8:00 AM and 8:00 PM in the `America/Los_Angeles` timezone. It reads Simplify's structured new-grad feed and keeps only software roles posted within the last seven days that explicitly target bachelor's-level new grads, early-career candidates, entry-level candidates, Engineer I/SDE I, a 2026 start, or zero-to-two years of experience. It excludes remote, internship, PhD-only, research-track, mid-level, senior+, 2027+, later-graduation, required-internship, and required-professional-experience roles. Supabase stores canonical requisition IDs for persistent deduplication, so alternate URLs and repeated workflow runs do not create duplicate alerts. Newly seen roles can alert for their first 24 hours; roles posted within the last hour include a direct Discord mention. The private dashboard's Wishlist tab controls which companies receive priority styling in the dashboard and Discord alerts; the next scheduled run reads the saved list.
+The `Greater Seattle Job Watch` workflow runs at 8:00 AM and 8:00 PM Pacific and reads Simplify's structured new-grad feed. The dashboard shows open, non-remote Greater Seattle software listings from the past 30 days, excluding internships and PhD-only roles. Strong matches must be posted within seven days, have an explicit entry-level or new-grad signal, and pass the job-description check for degree, experience and graduation requirements.
+
+Discord alerts are limited to strong matches first eligible within 24 hours of posting, with a direct mention within the first hour. Supabase stores canonical requisition IDs and alert status to suppress repeats. The Wishlist tab controls which companies are highlighted. A manual workflow run with `refresh_only` updates the dashboard and leaves any pending Discord alerts for the next regular run.
 
 It activates after these repository secrets are configured:
 

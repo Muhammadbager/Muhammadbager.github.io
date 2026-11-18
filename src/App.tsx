@@ -58,6 +58,14 @@ const defaultWishlistCompanies = [
 ];
 
 type DashboardTab = "overview" | "wishlist";
+const JOBS_PER_PAGE = 8;
+const jobPostedDate = new Intl.DateTimeFormat("en-US", {
+  month: "short", day: "numeric", timeZone: "America/Los_Angeles",
+});
+
+function isStrongMatch(job: JobMatch) {
+  return job.status === "new" || job.status === "match_pending";
+}
 
 const chartStages: ApplicationStage[] = [
   "Applied",
@@ -345,6 +353,10 @@ function Dashboard() {
   const [wishlistMessage, setWishlistMessage] = useState("");
   const [applications, setApplications] = useState<Application[]>([]);
   const [matches, setMatches] = useState<JobMatch[]>([]);
+  const [jobsLoading, setJobsLoading] = useState(true);
+  const [jobsError, setJobsError] = useState(false);
+  const [strongMatchesOnly, setStrongMatchesOnly] = useState(false);
+  const [visibleJobCount, setVisibleJobCount] = useState(JOBS_PER_PAGE);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingApplicationId, setEditingApplicationId] = useState<string | null>(null);
   const [editApplication, setEditApplication] = useState<ApplicationDraft | null>(null);
@@ -396,11 +408,14 @@ function Dashboard() {
     if (!supabase || !session) return;
     void Promise.all([
       supabase.from("applications").select("*").order("updated_at", { ascending: false }),
-      supabase.from("job_matches").select("*").neq("status", "expired").order("discovered_at", { ascending: false }).limit(12),
+      supabase.from("job_matches").select("*").in("status", ["new", "match_pending", "browse", "browse_seen"])
+        .order("posted_at", { ascending: false, nullsFirst: false }).order("discovered_at", { ascending: false }),
       supabase.from("job_preferences").select("wishlist_companies").eq("owner_id", session.user.id).maybeSingle(),
     ]).then(([applicationResult, matchResult, preferenceResult]) => {
       if (applicationResult.data) setApplications(applicationResult.data as Application[]);
       if (matchResult.data) setMatches(matchResult.data as JobMatch[]);
+      setJobsError(Boolean(matchResult.error));
+      setJobsLoading(false);
       if (preferenceResult.data?.wishlist_companies) {
         setWishlistCompanies(preferenceResult.data.wishlist_companies as string[]);
       } else if (preferenceResult.error) {
@@ -423,6 +438,8 @@ function Dashboard() {
   const interviewCount = applications.filter((application) =>
     ["Recruiter Screen", "Technical Interview", "Final Interview"].includes(application.stage),
   ).length;
+  const strongMatches = matches.filter(isStrongMatch);
+  const displayedJobs = strongMatchesOnly ? strongMatches : matches;
 
   async function signInWithPassword(event: FormEvent) {
     event.preventDefault();
@@ -767,7 +784,7 @@ function Dashboard() {
             <span>{wishlistCompanies.length} companies</span>
           </div>
           <p className="wishlist-description">
-            Matches from these companies receive wishlist styling in the dashboard and Discord alerts.
+            Jobs from these companies get a Wishlist label. Strong matches from wishlist companies have priority in Discord alerts.
             Changes take effect on the next scheduled search.
           </p>
           <form className="wishlist-add-form" onSubmit={addWishlistCompany}>
@@ -855,7 +872,7 @@ function Dashboard() {
         <Metric label="Total applications" value={applications.length} />
         <Metric label="Active" value={activeCount} />
         <Metric label="Interviews" value={interviewCount} />
-        <Metric label="New matches" value={matches.length} />
+        <Metric label="Strong matches" value={strongMatches.length} />
       </section>
       <section className="dashboard-grid">
         <article className="dashboard-panel chart-panel">
@@ -876,23 +893,44 @@ function Dashboard() {
         </article>
         <article className="dashboard-panel">
           <div className="panel-heading">
-            <div><p className="eyebrow">Discovery</p><h2>Recent matches</h2></div>
+            <div><p className="eyebrow">Discovery</p><h2>Greater Seattle jobs</h2></div>
             <span>8 AM / 8 PM PT</span>
           </div>
-          {matches.length ? (
+          <div className="job-filters" role="group" aria-label="Filter job listings">
+            <button type="button" aria-pressed={!strongMatchesOnly} onClick={() => {
+              setStrongMatchesOnly(false);
+              setVisibleJobCount(JOBS_PER_PAGE);
+            }}>All jobs</button>
+            <button type="button" aria-pressed={strongMatchesOnly} onClick={() => {
+              setStrongMatchesOnly(true);
+              setVisibleJobCount(JOBS_PER_PAGE);
+            }}>Strong matches</button>
+          </div>
+          {jobsLoading ? <EmptyState text="Loading job listings…" /> : jobsError ? (
+            <EmptyState text="Job listings couldn't load. Refresh the dashboard to try again." />
+          ) : displayedJobs.length ? (
             <div className="match-list">
-              {matches.map((match) => (
+              {displayedJobs.slice(0, visibleJobCount).map((match) => (
                 <a className={match.is_wishlist ? "wishlist-match" : ""} href={match.url} target="_blank" rel="noreferrer" key={match.id}>
                   <div>
                     <strong>{match.title}</strong>
                     <span>{match.company} · {match.location ?? "Location pending"}</span>
+                    {match.posted_at && <span>Posted <time dateTime={match.posted_at}>{jobPostedDate.format(new Date(match.posted_at))}</time></span>}
+                    <em className={isStrongMatch(match) ? "strong-match-label" : "browse-job-label"}>
+                      {isStrongMatch(match) ? "Strong match" : "General listing"}
+                    </em>
                     {match.is_wishlist && <em>Wishlist company</em>}
                   </div>
                   <ArrowUpRight size={17} />
                 </a>
               ))}
+              {displayedJobs.length > visibleJobCount && (
+                <button type="button" className="secondary-button show-more-jobs" onClick={() => setVisibleJobCount((count) => count + JOBS_PER_PAGE)}>
+                  Show more jobs
+                </button>
+              )}
             </div>
-          ) : <EmptyState text="New Greater Seattle matches will appear here." />}
+          ) : <EmptyState text={strongMatchesOnly ? "No recent strong matches. Check All jobs for more listings." : "No recent Greater Seattle listings in the feed."} />}
         </article>
       </section>
       <section className="dashboard-panel applications-panel">

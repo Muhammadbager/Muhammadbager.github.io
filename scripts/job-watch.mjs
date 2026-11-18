@@ -4,7 +4,8 @@ import { pathToFileURL } from "node:url";
 const SOURCE_URL =
   "https://raw.githubusercontent.com/SimplifyJobs/New-Grad-Positions/dev/.github/scripts/listings.json";
 
-const MAX_LISTING_AGE_HOURS = 7 * 24;
+const BOARD_AGE_HOURS = 30 * 24;
+const STRONG_MATCH_AGE_HOURS = 7 * 24;
 const MAX_ALERT_AGE_HOURS = 24;
 const JUST_POSTED_HOURS = 1;
 
@@ -21,7 +22,7 @@ const DEFAULT_WISHLIST = [
 ];
 
 const SEATTLE_AREA =
-  /\b(seattle|bellevue|kirkland|redmond|tacoma|renton|kent|bothell|woodinville|issaquah|mercer island|greater seattle)\b|\bWA\b/i;
+  /\b(seattle|bellevue|kirkland|redmond|tacoma|renton|kent|bothell|woodinville|issaquah|mercer island|everett|lynnwood|shoreline|sammamish|tukwila|auburn|federal way)\b/i;
 const SOFTWARE_ROLE = /\b(software|developer|development|swe|backend|full[ -]?stack)\b/i;
 const EARLY_CAREER_SIGNAL =
   /\b(new grad(?:uate)?|recent grad(?:uate)?|university grad(?:uate)?|college grad(?:uate)?|graduate software|early career|entry[ -]?level|junior|associate software|software engineer (?:i|1)|software developer (?:i|1)|software development engineer (?:i|1)|swe (?:i|1)|sde (?:i|1)|level (?:i|1)|2026 start|2026 grad(?:uate)?|class of 2026|0\s*(?:-|–|to)\s*2 years?|no (?:professional )?experience)\b/i;
@@ -29,6 +30,7 @@ const EXCLUDED_LEVEL =
   /\b(intern(ship)?|co[ -]?op|ph\.?d|doctoral|doctorate|postdoc(?:toral)?|research scientist|researcher|mid[ -]?(?:level|career)|senior|staff|principal|manager|director|lead|architect|software engineer (?:ii|iii|2|3)|software developer (?:ii|iii|2|3)|software development engineer (?:ii|iii|2|3)|swe (?:ii|iii|2|3)|sde (?:ii|iii|2|3)|level (?:ii|iii|2|3))\b/i;
 const INELIGIBLE_YEAR = /\b20(?:27|28|29)\b/i;
 const REMOTE_ROLE = /\bremote\b/i;
+const NON_GENERAL_ROLE = /\b(intern(ship)?|co[ -]?op|ph\.?d|doctoral|doctorate|postdoc(?:toral)?)\b/i;
 
 function decode(value) {
   return value
@@ -55,17 +57,19 @@ function htmlToText(value) {
 function cleanUrl(value) {
   try {
     const url = new URL(decode(value));
+    if (url.protocol !== "https:" || url.username || url.password) return "";
     for (const key of [...url.searchParams.keys()]) {
       if (/^(utm_|ref$|gh_src$|source$)/i.test(key)) url.searchParams.delete(key);
     }
     return url.toString();
   } catch {
-    return decode(value);
+    return "";
   }
 }
 
 function requisitionToken(value) {
-  const decoded = decodeURIComponent(value);
+  // Decode valid escapes while tolerating older rows with malformed URLs.
+  const decoded = value.replace(/%[0-9a-f]{2}/gi, (escape) => String.fromCharCode(parseInt(escape.slice(1), 16)));
   const named = decoded.match(/(?:jr|req|requisition)[-_]?(\d{5,})/i);
   if (named) return named[0].toLowerCase().replace(/[-_]/g, "");
   const uuid = decoded.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
@@ -90,11 +94,12 @@ export function makeExternalId({ company, title, url }) {
 }
 
 function hoursSince(timestamp, nowMs) {
-  if (!Number.isFinite(timestamp)) return null;
-  return Math.max(0, Math.floor((nowMs - timestamp * 1000) / 3_600_000));
+  if (!Number.isFinite(timestamp) || timestamp <= 0 || timestamp * 1000 > nowMs) return null;
+  return (nowMs - timestamp * 1000) / 3_600_000;
 }
 
 function ageLabel(hours) {
+  hours = Math.floor(hours);
   if (hours < 1) return "Less than 1 hour";
   if (hours < 24) return `${hours} ${hours === 1 ? "hour" : "hours"}`;
   const days = Math.floor(hours / 24);
@@ -122,10 +127,9 @@ export function parseListings(rawText, nowMs = Date.now(), wishlistCompanies = D
     const ageHours = hoursSince(Number(item.date_posted), nowMs);
     const eligibilityText = `${title} ${url}`;
 
-    if (!company || !title || !url || ageHours === null || ageHours > MAX_LISTING_AGE_HOURS) continue;
-    if (!SEATTLE_AREA.test(location) || REMOTE_ROLE.test(location)) continue;
-    if (!SOFTWARE_ROLE.test(title) || !EARLY_CAREER_SIGNAL.test(eligibilityText)) continue;
-    if (EXCLUDED_LEVEL.test(eligibilityText) || INELIGIBLE_YEAR.test(eligibilityText)) continue;
+    if (!company || !title || !url || ageHours === null || ageHours > BOARD_AGE_HOURS) continue;
+    if (!SEATTLE_AREA.test(location) || REMOTE_ROLE.test(`${location} ${title}`)) continue;
+    if (!SOFTWARE_ROLE.test(title) || NON_GENERAL_ROLE.test(title)) continue;
 
     const acceptsBachelors = degrees.some((degree) => /bachelor/.test(degree));
     const phdOnly = degrees.some((degree) => /ph\.?d|doctor/.test(degree)) && !acceptsBachelors;
@@ -141,13 +145,19 @@ export function parseListings(rawText, nowMs = Date.now(), wishlistCompanies = D
       discovered_at: new Date(nowMs).toISOString(),
       source: "Simplify New Grad Positions",
       is_wishlist: wishlist.some((wishlistCompany) => normalizedCompany.includes(wishlistCompany)),
-      status: "new",
+      strong_candidate: ageHours <= STRONG_MATCH_AGE_HOURS
+        && EARLY_CAREER_SIGNAL.test(eligibilityText)
+        && !EXCLUDED_LEVEL.test(eligibilityText)
+        && !INELIGIBLE_YEAR.test(eligibilityText),
       age_hours: ageHours,
       age: ageLabel(ageHours),
     };
     listing.external_id = makeExternalId(listing);
 
-    if (!uniqueListings.has(listing.external_id)) uniqueListings.set(listing.external_id, listing);
+    const previous = uniqueListings.get(listing.external_id);
+    if (!previous || (listing.strong_candidate && !previous.strong_candidate)) {
+      uniqueListings.set(listing.external_id, listing);
+    }
   }
 
   return [...uniqueListings.values()].sort(
@@ -200,8 +210,16 @@ export function evaluateJobDescription(rawText) {
   if (/\b(?:at least|minimum(?:\s+of)?)\s+(?:one|two|three|four|five|\d+)\s+years?[^.;]{0,100}\bexperience\b|\b(?:one|two|three|four|five|[1-9]\d*)\+\s+years?[^.;]{0,100}\bexperience\b|\b(?:one|two|three|four|five|[1-9]\d*)\s+years?[^.;]{0,80}\bexperience\s+required\b/i.test(experienceText)) {
     return { eligible: false, reason: "prior professional experience required" };
   }
+  const requiredSection = experienceText
+    .split(/\b(?:minimum|basic|required)\s+(?:qualifications|requirements)\b/i)[1]
+    ?.split(/\b(?:preferred qualifications|preferred experience|nice to have|benefits|about (?:us|the company))\b/i)[0];
+  if (requiredSection && /\b(?:one|two|three|four|five|[1-9]\d*)(?:\s*(?:-|–|to)\s*\d+)?\s+years?[^.;]{0,80}\bexperience\b/i.test(requiredSection)) {
+    return { eligible: false, reason: "prior professional experience listed in minimum qualifications" };
+  }
 
-  return { eligible: true, reason: "description passed" };
+  return /\b(?:qualifications?|requirements?|bachelor|experience)\b/i.test(text)
+    ? { eligible: true, reason: "description passed" }
+    : { eligible: null, reason: "job requirements unavailable" };
 }
 
 async function inspectListing(listing) {
@@ -219,24 +237,41 @@ async function inspectListing(listing) {
   }
 }
 
-export async function filterListingsByDescription(listings, concurrency = 5) {
-  const inspected = new Array(listings.length);
+export async function classifyListings(listings, inspect = inspectListing) {
+  const candidates = listings.filter((listing) => listing.strong_candidate);
+  const verifiedIds = new Set();
   let cursor = 0;
 
   async function worker() {
-    while (cursor < listings.length) {
-      const index = cursor;
-      cursor += 1;
-      inspected[index] = await inspectListing(listings[index]);
+    while (cursor < candidates.length) {
+      const listing = candidates[cursor++];
+      const result = await inspect(listing);
+      if (result.eligible === true) {
+        verifiedIds.add(listing.external_id);
+      } else {
+        console.log(`Dashboard only: ${listing.company}: ${listing.title} (${result.reason}).`);
+      }
     }
   }
 
-  await Promise.all(Array.from({ length: Math.min(concurrency, listings.length) }, () => worker()));
-  for (const result of inspected) {
-    if (result.eligible === false) console.log(`Rejected ${result.listing.company}: ${result.listing.title} (${result.reason}).`);
-    else if (result.eligible === null) console.log(`Kept title-verified ${result.listing.company}: ${result.listing.title} (${result.reason}).`);
-  }
-  return inspected.filter((result) => result.eligible !== false).map((result) => result.listing);
+  await Promise.all(Array.from({ length: Math.min(5, candidates.length) }, () => worker()));
+  return listings.map(({ strong_candidate: _candidate, ...listing }) => ({
+    ...listing,
+    is_strong_match: verifiedIds.has(listing.external_id),
+  }));
+}
+
+// Legacy "new" and "expired" rows already participated in alert deduplication.
+function alertHandled(status) {
+  return status === "new" || status === "browse_seen" || status === "expired";
+}
+
+export function listingStatus(listing, previousStatus, initialBaseline) {
+  const handled = alertHandled(previousStatus);
+  if (!listing.is_strong_match) return handled ? "browse_seen" : "browse";
+  return handled || initialBaseline || listing.age_hours > MAX_ALERT_AGE_HOURS
+    ? "new"
+    : "match_pending";
 }
 
 async function syncMatches(listings) {
@@ -246,76 +281,86 @@ async function syncMatches(listings) {
 
   if (!supabaseUrl || !secretKey || !ownerId) {
     console.log("Private backend secrets are not configured; discovery completed in dry-run mode.");
-    return listings;
+    return [];
   }
 
-  const existingResponse = await fetch(
-    `${supabaseUrl}/rest/v1/job_matches?owner_id=eq.${ownerId}&select=external_id,status,company,title,url,posted_at`,
-    { headers: { apikey: secretKey } },
-  );
-  if (!existingResponse.ok) {
-    throw new Error(`Supabase lookup failed (${existingResponse.status}): ${await existingResponse.text()}`);
+  const matchesUrl = `${supabaseUrl}/rest/v1/job_matches`;
+  const existingMatches = [];
+  const pageSize = 500;
+  let afterId = "";
+  while (true) {
+    const cursor = afterId ? `&id=gt.${afterId}` : "";
+    const response = await fetch(
+      `${matchesUrl}?owner_id=eq.${ownerId}&select=id,external_id,status,company,title,url,discovered_at&order=id.asc&limit=${pageSize}${cursor}`,
+      { headers: { apikey: secretKey } },
+    );
+    if (!response.ok) throw new Error(`Supabase lookup failed (${response.status}): ${await response.text()}`);
+    const page = await response.json();
+    existingMatches.push(...page);
+    if (page.length < pageSize) break;
+    afterId = page.at(-1).id;
   }
-  const existingMatches = await existingResponse.json();
+
   const existingByCanonicalId = new Map();
   for (const match of existingMatches) {
     const canonicalId = makeExternalId(match);
-    if (!existingByCanonicalId.has(canonicalId) || match.status !== "expired") {
+    const previous = existingByCanonicalId.get(canonicalId);
+    if (!previous || (alertHandled(match.status) && !alertHandled(previous.status))) {
       existingByCanonicalId.set(canonicalId, match);
     }
   }
-  const existingCanonicalIds = new Set(existingByCanonicalId.keys());
   const currentIds = new Set(listings.map((listing) => listing.external_id));
-  const staleIds = existingMatches
-    .filter((match) => match.status !== "expired" && !currentIds.has(match.external_id))
-    .map((match) => match.external_id);
+  const staleMatches = existingMatches.filter(
+    (match) => !match.status.startsWith("expired") && !currentIds.has(match.external_id),
+  );
 
-  for (let index = 0; index < staleIds.length; index += 40) {
-    const staleFilter = encodeURIComponent(`(${staleIds.slice(index, index + 40).join(",")})`);
-    const archiveResponse = await fetch(
-      `${supabaseUrl}/rest/v1/job_matches?owner_id=eq.${ownerId}&external_id=in.${staleFilter}`,
-      {
-        method: "PATCH",
-        headers: { apikey: secretKey, "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "expired" }),
-      },
-    );
-    if (!archiveResponse.ok) {
-      throw new Error(`Supabase archive failed (${archiveResponse.status}): ${await archiveResponse.text()}`);
+  for (const handled of [true, false]) {
+    const staleIds = staleMatches.filter((match) => alertHandled(match.status) === handled).map((match) => match.external_id);
+    for (let index = 0; index < staleIds.length; index += 40) {
+      const staleFilter = encodeURIComponent(`(${staleIds.slice(index, index + 40).join(",")})`);
+      await updateStatus(`external_id=in.${staleFilter}`, handled ? "expired" : "expired_browse");
     }
   }
 
-  if (listings.length) {
-    const payload = listings.map(({ age: _age, age_hours: _ageHours, ...listing }) => {
-      const previous = existingByCanonicalId.get(listing.external_id);
-      const previousStatus = previous?.status && previous.status !== "expired" ? previous.status : listing.status;
-      return { ...listing, status: previousStatus, owner_id: ownerId };
-    });
-    const response = await fetch(`${supabaseUrl}/rest/v1/job_matches?on_conflict=owner_id,external_id`, {
+  const pendingAlerts = [];
+  const payload = listings.map(({ age: _age, age_hours, is_strong_match, ...listing }) => {
+    const previous = existingByCanonicalId.get(listing.external_id);
+    const status = listingStatus({ age_hours, is_strong_match }, previous?.status, !existingMatches.length);
+    if (status === "match_pending") pendingAlerts.push({ ...listing, age_hours, age: _age });
+    return { ...listing, discovered_at: previous?.discovered_at ?? listing.discovered_at, status, owner_id: ownerId };
+  });
+
+  for (let index = 0; index < payload.length; index += 100) {
+    const response = await fetch(`${matchesUrl}?on_conflict=owner_id,external_id`, {
       method: "POST",
       headers: {
         apikey: secretKey,
         "Content-Type": "application/json",
         Prefer: "return=minimal,resolution=merge-duplicates",
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(payload.slice(index, index + 100)),
     });
     if (!response.ok) throw new Error(`Supabase insert failed (${response.status}): ${await response.text()}`);
   }
 
-  console.log(`Synced ${listings.length} current matches and archived ${staleIds.length} stale or ineligible matches.`);
-  if (!existingMatches.length) {
-    console.log("Initial baseline stored without sending Discord alerts.");
-    return [];
-  }
-  return listings.filter(
-    (listing) => !existingCanonicalIds.has(listing.external_id) && listing.age_hours <= MAX_ALERT_AGE_HOURS,
-  );
+  console.log(`Synced ${listings.length} dashboard jobs and archived ${staleMatches.length} stale jobs.`);
+  if (!existingMatches.length) console.log("Initial baseline stored without sending Discord alerts.");
+  return pendingAlerts;
+}
+
+async function updateStatus(filter, status) {
+  const { SUPABASE_URL: url, SUPABASE_SECRET_KEY: key, OWNER_USER_ID: ownerId } = process.env;
+  const response = await fetch(`${url}/rest/v1/job_matches?owner_id=eq.${ownerId}&${filter}`, {
+    method: "PATCH",
+    headers: { apikey: key, "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  if (!response.ok) throw new Error(`Supabase status update failed (${response.status}): ${await response.text()}`);
 }
 
 async function notifyDiscord(matches) {
   const webhook = process.env.DISCORD_WEBHOOK_URL;
-  if (!webhook || !matches.length) return;
+  if (!webhook || !matches.length) return 0;
 
   const discordUserId = /^\d{15,22}$/.test(process.env.DISCORD_USER_ID ?? "")
     ? process.env.DISCORD_USER_ID
@@ -324,6 +369,8 @@ async function notifyDiscord(matches) {
   for (const match of matches) {
     const justPosted = match.age_hours <= JUST_POSTED_HOURS;
     const mention = justPosted && discordUserId ? `<@${discordUserId}> ` : "";
+    // Record the attempt before delivery to avoid duplicate pings if the webhook outcome is ambiguous.
+    await updateStatus(`external_id=eq.${match.external_id}&status=eq.match_pending`, "new");
     const response = await fetch(webhook, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -338,7 +385,7 @@ async function notifyDiscord(matches) {
           description: `${match.company} · ${match.location}`,
           timestamp: match.posted_at,
           fields: [
-            { name: "Priority", value: match.is_wishlist ? "Wishlist company" : "Broader match", inline: true },
+            { name: "Priority", value: match.is_wishlist ? "Wishlist company" : "Strong match", inline: true },
             { name: "Posted", value: match.age, inline: true },
             { name: "Source", value: match.source, inline: true },
           ],
@@ -348,6 +395,7 @@ async function notifyDiscord(matches) {
     });
     if (!response.ok) throw new Error(`Discord notification failed (${response.status}): ${await response.text()}`);
   }
+  return matches.length;
 }
 
 async function main() {
@@ -355,17 +403,21 @@ async function main() {
   if (!response.ok) throw new Error(`Source fetch failed (${response.status})`);
   const wishlist = await loadWishlist();
   const parsedListings = parseListings(await response.text(), Date.now(), wishlist);
-  const listings = await filterListingsByDescription(parsedListings);
+  const listings = await classifyListings(parsedListings);
   console.log(`Loaded ${wishlist.length} wishlist companies.`);
-  console.log(`Found ${listings.length} recent eligible Greater Seattle roles (${listings.filter((job) => job.is_wishlist).length} wishlist).`);
+  console.log(`Found ${listings.length} Greater Seattle jobs for the dashboard (${listings.filter((job) => job.is_strong_match).length} strong matches).`);
   if (process.env.DEBUG_MATCHES === "1") {
     for (const listing of listings) {
       console.log(`- ${listing.company}: ${listing.title} | ${listing.age} | ${listing.location} | ${listing.url}`);
     }
   }
-  const newMatches = await syncMatches(listings);
-  await notifyDiscord(newMatches);
-  console.log(`Processed ${newMatches.length} unseen alert-eligible matches.`);
+  const pendingAlerts = await syncMatches(listings);
+  if (process.env.REFRESH_ONLY === "true") {
+    console.log("Dashboard refresh complete. Discord alerts remain queued.");
+    return;
+  }
+  const sent = await notifyDiscord(pendingAlerts);
+  console.log(`Sent ${sent} Discord alerts for ${pendingAlerts.length} eligible jobs.`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

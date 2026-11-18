@@ -39,5 +39,6 @@ export interface JobMatch {
   posted_at: string | null;
   discovered_at: string;
   is_wishlist: boolean;
+  status: "new" | "match_pending" | "browse" | "browse_seen";
 }
 

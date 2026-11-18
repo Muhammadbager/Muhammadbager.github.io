@@ -5,6 +5,15 @@ on:
     - cron: "0 8,20 * * *"
       timezone: "America/Los_Angeles"
   workflow_dispatch:
+    inputs:
+      refresh_only:
+        description: Refresh the dashboard without sending Discord alerts
+        type: boolean
+        default: false
+
+concurrency:
+  group: greater-seattle-job-watch
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -25,6 +34,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           OWNER_USER_ID: ${{ secrets.OWNER_USER_ID }}
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_URL: ${{ !inputs.refresh_only && secrets.DISCORD_WEBHOOK_URL || '' }}
           DISCORD_USER_ID: ${{ secrets.DISCORD_USER_ID }}
+          REFRESH_ONLY: ${{ inputs.refresh_only }}
 
