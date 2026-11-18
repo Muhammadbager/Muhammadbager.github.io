@@ -316,11 +316,14 @@ function Portfolio() {
 function Dashboard() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [email, setEmail] = useState(profile.email);
-  const [otp, setOtp] = useState("");
-  const [codeSent, setCodeSent] = useState(false);
+  const [password, setPassword] = useState("");
   const [authBusy, setAuthBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordBusy, setPasswordBusy] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState("");
   const [applications, setApplications] = useState<Application[]>([]);
   const [matches, setMatches] = useState<JobMatch[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -396,46 +399,19 @@ function Dashboard() {
     ["Recruiter Screen", "Technical Interview", "Final Interview"].includes(application.stage),
   ).length;
 
-  async function sendSignInCode(event: FormEvent) {
+  async function signInWithPassword(event: FormEvent) {
     event.preventDefault();
     if (!supabase) return;
-    if (email.trim().toLowerCase() !== profile.email.toLowerCase()) {
-      setMessage("This dashboard is restricted to the owner email address.");
-      return;
-    }
     setAuthBusy(true);
-    setMessage("Sending your one-time code…");
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: { shouldCreateUser: false },
+    setMessage("Signing in securely…");
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: profile.email,
+      password,
     });
+    setPassword("");
     setAuthBusy(false);
     if (error) {
-      setMessage(error.message);
-      return;
-    }
-    setCodeSent(true);
-    setMessage("Code sent. Enter it below to finish signing in on this tab.");
-  }
-
-  async function verifySignInCode(event: FormEvent) {
-    event.preventDefault();
-    if (!supabase) return;
-    const token = otp.replace(/\s/g, "");
-    if (!/^\d{6,8}$/.test(token)) {
-      setMessage("Enter the numeric code from your email.");
-      return;
-    }
-    setAuthBusy(true);
-    setMessage("Verifying your code…");
-    const { data, error } = await supabase.auth.verifyOtp({
-      email: email.trim(),
-      token,
-      type: "email",
-    });
-    setAuthBusy(false);
-    if (error) {
-      setMessage(error.message);
+      setMessage("The email or password is incorrect. If you have not set a password yet, use the setup link below.");
       return;
     }
     if (data.session && !isOwnerSession(data.session)) {
@@ -445,6 +421,49 @@ function Dashboard() {
     }
     if (data.session) setSession(data.session);
     window.history.replaceState(null, "", `${window.location.pathname}#dashboard`);
+  }
+
+  async function sendPasswordSetupLink() {
+    if (!supabase) return;
+    setAuthBusy(true);
+    setMessage("Sending a one-time password setup link…");
+    const { error } = await supabase.auth.signInWithOtp({
+      email: profile.email,
+      options: {
+        shouldCreateUser: false,
+        emailRedirectTo: `${window.location.origin}${window.location.pathname}?auth=dashboard`,
+      },
+    });
+    setAuthBusy(false);
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+    setMessage("Check your email. Open the one-time link, then choose Account security to set your password.");
+  }
+
+  async function updateDashboardPassword(event: FormEvent) {
+    event.preventDefault();
+    if (!supabase || !session) return;
+    if (newPassword.length < 12) {
+      setPasswordMessage("Use at least 12 characters.");
+      return;
+    }
+    if (!/[a-z]/.test(newPassword) || !/[A-Z]/.test(newPassword) || !/\d/.test(newPassword) || !/[^A-Za-z0-9]/.test(newPassword)) {
+      setPasswordMessage("Include uppercase, lowercase, a number, and a symbol.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordMessage("The two passwords do not match.");
+      return;
+    }
+    setPasswordBusy(true);
+    setPasswordMessage("Saving your password securely…");
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setNewPassword("");
+    setConfirmPassword("");
+    setPasswordBusy(false);
+    setPasswordMessage(error ? error.message : "Password saved. Supabase stores only its salted bcrypt hash; use the new password next time you sign in.");
   }
 
   async function addApplication(event: FormEvent) {
@@ -611,52 +630,26 @@ function Dashboard() {
           <LockKeyhole size={28} />
           <p className="eyebrow">Owner access</p>
           <h1>Sign in to your career dashboard</h1>
-          <p>Only the authorized owner email can sign in. Enter its one-time code here without opening another dashboard tab.</p>
-          {!codeSent ? (
-            <form onSubmit={sendSignInCode}>
-              <label htmlFor="dashboard-email">Email address</label>
-              <input
-                id="dashboard-email"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                autoComplete="email"
-                required
-              />
-              <button className="primary-button" type="submit" disabled={authBusy}>
-                {authBusy ? "Sending…" : "Email me a sign-in code"}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={verifySignInCode}>
-              <label htmlFor="dashboard-code">One-time code</label>
-              <input
-                id="dashboard-code"
-                type="text"
-                value={otp}
-                onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 8))}
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                placeholder="Enter code"
-                autoFocus
-                required
-              />
-              <button className="primary-button" type="submit" disabled={authBusy}>
-                {authBusy ? "Verifying…" : "Verify and sign in"}
-              </button>
-              <button
-                className="secondary-button"
-                type="button"
-                onClick={() => {
-                  setCodeSent(false);
-                  setOtp("");
-                  setMessage("");
-                }}
-              >
-                Start over
-              </button>
-            </form>
-          )}
+          <p>Sign in with the fixed owner email and your password. The site never stores or logs the password.</p>
+          <form onSubmit={signInWithPassword}>
+            <label htmlFor="dashboard-email">Authorized email</label>
+            <input id="dashboard-email" type="email" value={profile.email} autoComplete="username" readOnly />
+            <label htmlFor="dashboard-password">Password</label>
+            <input
+              id="dashboard-password"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete="current-password"
+              required
+            />
+            <button className="primary-button" type="submit" disabled={authBusy}>
+              {authBusy ? "Signing in…" : "Sign in"}
+            </button>
+            <button className="secondary-button" type="button" onClick={() => void sendPasswordSetupLink()} disabled={authBusy}>
+              Set up or recover password
+            </button>
+          </form>
           {message && <p className="form-message" aria-live="polite">{message}</p>}
         </div>
       </DashboardFrame>
@@ -670,8 +663,51 @@ function Dashboard() {
           <p className="eyebrow">Career command center</p>
           <h1>Applications at a glance</h1>
         </div>
-        <div className="dashboard-location"><MapPin size={16} /> Greater Seattle only</div>
+        <div className="dashboard-heading-actions">
+          <div className="dashboard-location"><MapPin size={16} /> Greater Seattle only</div>
+          <button className="secondary-button" type="button" onClick={() => setShowPasswordForm((value) => !value)}>
+            <LockKeyhole size={15} /> {showPasswordForm ? "Close security" : "Account security"}
+          </button>
+        </div>
       </div>
+      {showPasswordForm && (
+        <section className="dashboard-panel security-panel">
+          <div className="panel-heading">
+            <div><p className="eyebrow">Owner security</p><h2>Set or change password</h2></div>
+          </div>
+          <form className="application-form security-form" onSubmit={updateDashboardPassword}>
+            <label>
+              New password
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                autoComplete="new-password"
+                minLength={12}
+                required
+              />
+            </label>
+            <label>
+              Confirm new password
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                autoComplete="new-password"
+                minLength={12}
+                required
+              />
+            </label>
+            <div className="form-actions form-span-2">
+              <button className="primary-button" type="submit" disabled={passwordBusy}>
+                {passwordBusy ? "Saving…" : "Save password"}
+              </button>
+              <span className="security-hint">12+ characters with uppercase, lowercase, a number, and a symbol.</span>
+            </div>
+          </form>
+          {passwordMessage && <p className="tracker-message" aria-live="polite">{passwordMessage}</p>}
+        </section>
+      )}
       <section className="metric-grid" aria-label="Application summary">
         <Metric label="Total applications" value={applications.length} />
         <Metric label="Active" value={activeCount} />
