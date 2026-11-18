@@ -112,6 +112,10 @@ function daysToApply(listingDate: string | null, appliedDate: string | null) {
   return `${days} ${Math.abs(days) === 1 ? "day" : "days"}`;
 }
 
+function isOwnerSession(candidate: Session | null) {
+  return candidate?.user.email?.trim().toLowerCase() === profile.email.toLowerCase();
+}
+
 function App() {
   const isDashboardRoute = () =>
     window.location.hash.startsWith("#dashboard") ||
@@ -331,6 +335,7 @@ function Dashboard() {
       setLoading(false);
       return;
     }
+    const authClient = supabase;
 
     const finishAuthCallback = () => {
       if (new URLSearchParams(window.location.search).get("auth") === "dashboard") {
@@ -340,13 +345,25 @@ function Dashboard() {
     const callbackError = new URLSearchParams(window.location.hash.slice(1)).get("error_description");
     if (callbackError) setMessage(callbackError);
 
-    void supabase.auth.getSession().then(({ data, error }) => {
-      setSession(data.session);
+    void authClient.auth.getSession().then(({ data, error }) => {
       if (error) setMessage(error.message);
-      if (data.session) finishAuthCallback();
+      if (data.session && !isOwnerSession(data.session)) {
+        setSession(null);
+        setMessage("This account is not authorized to access the owner dashboard.");
+        void authClient.auth.signOut();
+      } else {
+        setSession(data.session);
+        if (data.session) finishAuthCallback();
+      }
       setLoading(false);
     });
-    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data } = authClient.auth.onAuthStateChange((_event, nextSession) => {
+      if (nextSession && !isOwnerSession(nextSession)) {
+        setSession(null);
+        setMessage("This account is not authorized to access the owner dashboard.");
+        void authClient.auth.signOut();
+        return;
+      }
       setSession(nextSession);
       if (nextSession) finishAuthCallback();
     });
@@ -419,6 +436,11 @@ function Dashboard() {
     setAuthBusy(false);
     if (error) {
       setMessage(error.message);
+      return;
+    }
+    if (data.session && !isOwnerSession(data.session)) {
+      await supabase.auth.signOut();
+      setMessage("This account is not authorized to access the owner dashboard.");
       return;
     }
     if (data.session) setSession(data.session);
@@ -589,7 +611,7 @@ function Dashboard() {
           <LockKeyhole size={28} />
           <p className="eyebrow">Owner access</p>
           <h1>Sign in to your career dashboard</h1>
-          <p>Enter the one-time code from your email to sign in without opening another dashboard tab.</p>
+          <p>Only the authorized owner email can sign in. Enter its one-time code here without opening another dashboard tab.</p>
           {!codeSent ? (
             <form onSubmit={sendSignInCode}>
               <label htmlFor="dashboard-email">Email address</label>
