@@ -8,17 +8,17 @@ const MAX_LISTING_AGE_HOURS = 7 * 24;
 const MAX_ALERT_AGE_HOURS = 24;
 const JUST_POSTED_HOURS = 1;
 
-const WISHLIST = new Set([
-  "google",
-  "uber",
-  "meta",
-  "amazon",
-  "doordash",
-  "tiktok",
-  "shopify",
-  "costco",
-  "stripe",
-]);
+const DEFAULT_WISHLIST = [
+  "Google",
+  "Uber",
+  "Meta",
+  "Amazon",
+  "DoorDash",
+  "TikTok",
+  "Shopify",
+  "Costco",
+  "Stripe",
+];
 
 const SEATTLE_AREA =
   /\b(seattle|bellevue|kirkland|redmond|tacoma|renton|kent|bothell|woodinville|issaquah|mercer island|greater seattle)\b|\bWA\b/i;
@@ -101,10 +101,13 @@ function ageLabel(hours) {
   return `${days} ${days === 1 ? "day" : "days"}`;
 }
 
-export function parseListings(rawText, nowMs = Date.now()) {
+export function parseListings(rawText, nowMs = Date.now(), wishlistCompanies = DEFAULT_WISHLIST) {
   const sourceListings = JSON.parse(rawText);
   if (!Array.isArray(sourceListings)) throw new Error("Simplify listings payload is not an array.");
 
+  const wishlist = wishlistCompanies
+    .map((company) => String(company).toLowerCase().replace(/[^a-z0-9]/g, ""))
+    .filter(Boolean);
   const uniqueListings = new Map();
 
   for (const item of sourceListings) {
@@ -137,7 +140,7 @@ export function parseListings(rawText, nowMs = Date.now()) {
       posted_at: new Date(Number(item.date_posted) * 1000).toISOString(),
       discovered_at: new Date(nowMs).toISOString(),
       source: "Simplify New Grad Positions",
-      is_wishlist: [...WISHLIST].some((wishlistCompany) => normalizedCompany.includes(wishlistCompany)),
+      is_wishlist: wishlist.some((wishlistCompany) => normalizedCompany.includes(wishlistCompany)),
       status: "new",
       age_hours: ageHours,
       age: ageLabel(ageHours),
@@ -150,6 +153,27 @@ export function parseListings(rawText, nowMs = Date.now()) {
   return [...uniqueListings.values()].sort(
     (a, b) => Number(b.is_wishlist) - Number(a.is_wishlist) || Date.parse(b.posted_at) - Date.parse(a.posted_at),
   );
+}
+
+async function loadWishlist() {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const secretKey = process.env.SUPABASE_SECRET_KEY;
+  const ownerId = process.env.OWNER_USER_ID;
+
+  if (!supabaseUrl || !secretKey || !ownerId) return DEFAULT_WISHLIST;
+
+  const response = await fetch(
+    `${supabaseUrl}/rest/v1/job_preferences?owner_id=eq.${ownerId}&select=wishlist_companies&limit=1`,
+    { headers: { apikey: secretKey } },
+  );
+  if (!response.ok) {
+    console.log("Wishlist preferences are not available yet; using the default company list.");
+    return DEFAULT_WISHLIST;
+  }
+
+  const rows = await response.json();
+  const savedWishlist = rows[0]?.wishlist_companies;
+  return Array.isArray(savedWishlist) ? savedWishlist : DEFAULT_WISHLIST;
 }
 
 export function evaluateJobDescription(rawText) {
@@ -272,7 +296,7 @@ async function syncMatches(listings) {
       headers: {
         apikey: secretKey,
         "Content-Type": "application/json",
-        Prefer: "return=minimal,resolution=ignore-duplicates",
+        Prefer: "return=minimal,resolution=merge-duplicates",
       },
       body: JSON.stringify(payload),
     });
@@ -329,8 +353,10 @@ async function notifyDiscord(matches) {
 async function main() {
   const response = await fetch(SOURCE_URL, { headers: { "User-Agent": "Muhammadbager-Career-Deck/1.0" } });
   if (!response.ok) throw new Error(`Source fetch failed (${response.status})`);
-  const parsedListings = parseListings(await response.text());
+  const wishlist = await loadWishlist();
+  const parsedListings = parseListings(await response.text(), Date.now(), wishlist);
   const listings = await filterListingsByDescription(parsedListings);
+  console.log(`Loaded ${wishlist.length} wishlist companies.`);
   console.log(`Found ${listings.length} recent eligible Greater Seattle roles (${listings.filter((job) => job.is_wishlist).length} wishlist).`);
   if (process.env.DEBUG_MATCHES === "1") {
     for (const listing of listings) {

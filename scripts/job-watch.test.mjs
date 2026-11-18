@@ -73,3 +73,13 @@ test("uses the underlying requisition ID to deduplicate alternate application UR
 
   assert.equal(first, second);
 });
+
+test("uses a saved company wishlist instead of the built-in defaults", () => {
+  const stripe = listing({ company_name: "Stripe", url: "https://stripe.com/jobs/8128744" });
+  const microsoft = listing({ company_name: "Microsoft", url: "https://jobs.microsoft.com/jobs/9876543" });
+
+  const results = parseListings(JSON.stringify([stripe, microsoft]), NOW, ["Microsoft"]);
+
+  assert.equal(results.find((result) => result.company === "Microsoft")?.is_wishlist, true);
+  assert.equal(results.find((result) => result.company === "Stripe")?.is_wishlist, false);
+});

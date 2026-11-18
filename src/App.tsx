@@ -45,6 +45,20 @@ const applicationStages: ApplicationStage[] = [
   "Accepted",
 ];
 
+const defaultWishlistCompanies = [
+  "Google",
+  "Uber",
+  "Meta",
+  "Amazon",
+  "DoorDash",
+  "TikTok",
+  "Shopify",
+  "Costco",
+  "Stripe",
+];
+
+type DashboardTab = "overview" | "wishlist";
+
 const chartStages: ApplicationStage[] = [
   "Applied",
   "Online Assessment",
@@ -324,6 +338,11 @@ function Dashboard() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordBusy, setPasswordBusy] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState("");
+  const [dashboardTab, setDashboardTab] = useState<DashboardTab>("overview");
+  const [wishlistCompanies, setWishlistCompanies] = useState(defaultWishlistCompanies);
+  const [wishlistInput, setWishlistInput] = useState("");
+  const [wishlistSaving, setWishlistSaving] = useState(false);
+  const [wishlistMessage, setWishlistMessage] = useState("");
   const [applications, setApplications] = useState<Application[]>([]);
   const [matches, setMatches] = useState<JobMatch[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -378,9 +397,15 @@ function Dashboard() {
     void Promise.all([
       supabase.from("applications").select("*").order("updated_at", { ascending: false }),
       supabase.from("job_matches").select("*").neq("status", "expired").order("discovered_at", { ascending: false }).limit(12),
-    ]).then(([applicationResult, matchResult]) => {
+      supabase.from("job_preferences").select("wishlist_companies").eq("owner_id", session.user.id).maybeSingle(),
+    ]).then(([applicationResult, matchResult, preferenceResult]) => {
       if (applicationResult.data) setApplications(applicationResult.data as Application[]);
       if (matchResult.data) setMatches(matchResult.data as JobMatch[]);
+      if (preferenceResult.data?.wishlist_companies) {
+        setWishlistCompanies(preferenceResult.data.wishlist_companies as string[]);
+      } else if (preferenceResult.error) {
+        setWishlistMessage("Wishlist storage is not connected yet. Run the included Supabase migration, then save this list.");
+      }
     });
   }, [session]);
 
@@ -464,6 +489,48 @@ function Dashboard() {
     setConfirmPassword("");
     setPasswordBusy(false);
     setPasswordMessage(error ? error.message : "Password saved. Supabase stores only its salted bcrypt hash; use the new password next time you sign in.");
+  }
+
+  function addWishlistCompany(event: FormEvent) {
+    event.preventDefault();
+    const company = wishlistInput.trim();
+    if (!company) return;
+    if (wishlistCompanies.some((value) => value.toLowerCase() === company.toLowerCase())) {
+      setWishlistMessage(`${company} is already on your wishlist.`);
+      return;
+    }
+    setWishlistCompanies((values) => [...values, company]);
+    setWishlistInput("");
+    setWishlistMessage("Unsaved changes.");
+  }
+
+  function removeWishlistCompany(company: string) {
+    setWishlistCompanies((values) => values.filter((value) => value !== company));
+    setWishlistMessage("Unsaved changes.");
+  }
+
+  async function saveWishlist() {
+    if (!supabase || !session) return;
+    setWishlistSaving(true);
+    setWishlistMessage("Saving wishlist…");
+    const normalized = [...new Map(
+      wishlistCompanies
+        .map((company) => company.trim())
+        .filter(Boolean)
+        .map((company) => [company.toLowerCase(), company]),
+    ).values()].sort((a, b) => a.localeCompare(b));
+    const { error } = await supabase.from("job_preferences").upsert({
+      owner_id: session.user.id,
+      wishlist_companies: normalized,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "owner_id" });
+    setWishlistSaving(false);
+    if (error) {
+      setWishlistMessage(`Wishlist could not be saved: ${error.message}`);
+      return;
+    }
+    setWishlistCompanies(normalized);
+    setWishlistMessage("Wishlist saved. The next scheduled job search will use it.");
   }
 
   async function addApplication(event: FormEvent) {
@@ -661,7 +728,7 @@ function Dashboard() {
       <div className="dashboard-heading">
         <div>
           <p className="eyebrow">Career command center</p>
-          <h1>Applications at a glance</h1>
+          <h1>{dashboardTab === "overview" ? "Applications at a glance" : "Company wishlist"}</h1>
         </div>
         <div className="dashboard-heading-actions">
           <div className="dashboard-location"><MapPin size={16} /> Greater Seattle only</div>
@@ -670,6 +737,82 @@ function Dashboard() {
           </button>
         </div>
       </div>
+      <div className="dashboard-tabs" role="tablist" aria-label="Dashboard sections">
+        <button
+          className={dashboardTab === "overview" ? "active" : ""}
+          type="button"
+          role="tab"
+          aria-selected={dashboardTab === "overview"}
+          onClick={() => setDashboardTab("overview")}
+        >
+          Overview
+        </button>
+        <button
+          className={dashboardTab === "wishlist" ? "active" : ""}
+          type="button"
+          role="tab"
+          aria-selected={dashboardTab === "wishlist"}
+          onClick={() => setDashboardTab("wishlist")}
+        >
+          Wishlist <span>{wishlistCompanies.length}</span>
+        </button>
+      </div>
+      {dashboardTab === "wishlist" ? (
+        <section className="dashboard-panel wishlist-panel" role="tabpanel">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">Discovery priorities</p>
+              <h2>Wishlist companies</h2>
+            </div>
+            <span>{wishlistCompanies.length} companies</span>
+          </div>
+          <p className="wishlist-description">
+            Matches from these companies receive wishlist styling in the dashboard and Discord alerts.
+            Changes take effect on the next scheduled search.
+          </p>
+          <form className="wishlist-add-form" onSubmit={addWishlistCompany}>
+            <label htmlFor="wishlist-company">Add company</label>
+            <div>
+              <input
+                id="wishlist-company"
+                value={wishlistInput}
+                onChange={(event) => setWishlistInput(event.target.value)}
+                placeholder="Microsoft, Airbnb, Nvidia…"
+              />
+              <button className="secondary-button" type="submit"><Plus size={15} /> Add</button>
+            </div>
+          </form>
+          {wishlistCompanies.length ? (
+            <div className="wishlist-list" aria-label="Wishlist companies">
+              {wishlistCompanies.map((company) => (
+                <div className="wishlist-company" key={company.toLowerCase()}>
+                  <span>{company}</span>
+                  <button type="button" onClick={() => removeWishlistCompany(company)} aria-label={`Remove ${company}`}>
+                    <X size={15} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : <EmptyState text="Add companies to begin prioritizing job matches." />}
+          <div className="wishlist-actions">
+            <button className="primary-button" type="button" onClick={() => void saveWishlist()} disabled={wishlistSaving}>
+              {wishlistSaving ? "Saving…" : "Save wishlist"}
+            </button>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => {
+                setWishlistCompanies(defaultWishlistCompanies);
+                setWishlistMessage("Defaults restored locally. Save to apply them.");
+              }}
+            >
+              Restore defaults
+            </button>
+          </div>
+          {wishlistMessage && <p className="wishlist-message" aria-live="polite">{wishlistMessage}</p>}
+        </section>
+      ) : (
+        <>
       {showPasswordForm && (
         <section className="dashboard-panel security-panel">
           <div className="panel-heading">
@@ -739,8 +882,12 @@ function Dashboard() {
           {matches.length ? (
             <div className="match-list">
               {matches.map((match) => (
-                <a href={match.url} target="_blank" rel="noreferrer" key={match.id}>
-                  <div><strong>{match.title}</strong><span>{match.company} · {match.location ?? "Location pending"}</span></div>
+                <a className={match.is_wishlist ? "wishlist-match" : ""} href={match.url} target="_blank" rel="noreferrer" key={match.id}>
+                  <div>
+                    <strong>{match.title}</strong>
+                    <span>{match.company} · {match.location ?? "Location pending"}</span>
+                    {match.is_wishlist && <em>Wishlist company</em>}
+                  </div>
                   <ArrowUpRight size={17} />
                 </a>
               ))}
@@ -888,6 +1035,8 @@ function Dashboard() {
           </div>
         ) : <EmptyState text="Your imported applications will appear here." />}
       </section>
+        </>
+      )}
     </DashboardFrame>
   );
 }
