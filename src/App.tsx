@@ -377,7 +377,7 @@ function Dashboard() {
     if (!supabase || !session) return;
     void Promise.all([
       supabase.from("applications").select("*").order("updated_at", { ascending: false }),
-      supabase.from("job_matches").select("*").order("discovered_at", { ascending: false }).limit(12),
+      supabase.from("job_matches").select("*").neq("status", "expired").order("discovered_at", { ascending: false }).limit(12),
     ]).then(([applicationResult, matchResult]) => {
       if (applicationResult.data) setApplications(applicationResult.data as Application[]);
       if (matchResult.data) setMatches(matchResult.data as JobMatch[]);
