@@ -13,6 +13,7 @@ import {
   Mail,
   MapPin,
   Menu,
+  Plus,
   X,
 } from "lucide-react";
 import {
@@ -26,15 +27,33 @@ import {
 } from "recharts";
 import { experience, profile, projects, skills } from "./portfolio-data";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
-import type { Application, JobMatch } from "./types";
+import type { Application, ApplicationStage, JobMatch } from "./types";
 
-const stageOrder = [
+const applicationStages: ApplicationStage[] = [
+  "Discovered",
+  "Saved",
+  "Ready",
   "Applied",
   "Online Assessment",
   "Recruiter Screen",
   "Technical Interview",
   "Final Interview",
   "Offer",
+  "Rejected",
+  "Withdrawn",
+  "Position Closed",
+  "Accepted",
+];
+
+const chartStages: ApplicationStage[] = [
+  "Applied",
+  "Online Assessment",
+  "Recruiter Screen",
+  "Technical Interview",
+  "Final Interview",
+  "Offer",
+  "Rejected",
+  "Accepted",
 ];
 
 function App() {
@@ -241,6 +260,17 @@ function Dashboard() {
   const [message, setMessage] = useState("");
   const [applications, setApplications] = useState<Application[]>([]);
   const [matches, setMatches] = useState<JobMatch[]>([]);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [savingApplicationId, setSavingApplicationId] = useState<string | null>(null);
+  const [trackerMessage, setTrackerMessage] = useState("");
+  const [newApplication, setNewApplication] = useState({
+    company: "",
+    job_title: "",
+    job_url: "",
+    location: "Greater Seattle Area",
+    applied_date: new Date().toISOString().slice(0, 10),
+    stage: "Applied" as ApplicationStage,
+  });
 
   useEffect(() => {
     if (!supabase) {
@@ -281,7 +311,7 @@ function Dashboard() {
   }, [session]);
 
   const chartData = useMemo(
-    () => stageOrder.map((stage) => ({
+    () => chartStages.map((stage) => ({
       stage: stage.replace(" Interview", ""),
       count: applications.filter((application) => application.stage === stage).length,
     })),
@@ -310,6 +340,83 @@ function Dashboard() {
       },
     });
     setMessage(error ? error.message : "Check your email for the secure sign-in link.");
+  }
+
+  async function addApplication(event: FormEvent) {
+    event.preventDefault();
+    if (!supabase || !session) return;
+    setSavingApplicationId("new");
+    setTrackerMessage("");
+    const payload = {
+      owner_id: session.user.id,
+      company: newApplication.company.trim(),
+      job_title: newApplication.job_title.trim(),
+      job_url: newApplication.job_url.trim() || null,
+      location: newApplication.location.trim() || null,
+      applied_date: newApplication.applied_date || null,
+      stage: newApplication.stage,
+      source: "Manual",
+      updated_at: new Date().toISOString(),
+    };
+    const { data, error } = await supabase
+      .from("applications")
+      .insert(payload)
+      .select("*")
+      .single();
+
+    if (error || !data) {
+      setTrackerMessage(error?.message ?? "The application could not be saved.");
+      setSavingApplicationId(null);
+      return;
+    }
+
+    await supabase.from("stage_history").insert({
+      owner_id: session.user.id,
+      application_id: data.id,
+      stage: data.stage,
+    });
+    setApplications((current) => [data as Application, ...current]);
+    setNewApplication({
+      company: "",
+      job_title: "",
+      job_url: "",
+      location: "Greater Seattle Area",
+      applied_date: new Date().toISOString().slice(0, 10),
+      stage: "Applied",
+    });
+    setShowAddForm(false);
+    setSavingApplicationId(null);
+    setTrackerMessage("Application added.");
+  }
+
+  async function updateApplicationStage(application: Application, stage: ApplicationStage) {
+    if (!supabase || !session || stage === application.stage) return;
+    setSavingApplicationId(application.id);
+    setTrackerMessage("");
+    const updatedAt = new Date().toISOString();
+    const { data, error } = await supabase
+      .from("applications")
+      .update({ stage, updated_at: updatedAt })
+      .eq("id", application.id)
+      .select("*")
+      .single();
+
+    if (error || !data) {
+      setTrackerMessage(error?.message ?? "The stage could not be updated.");
+      setSavingApplicationId(null);
+      return;
+    }
+
+    await supabase.from("stage_history").insert({
+      owner_id: session.user.id,
+      application_id: application.id,
+      stage,
+    });
+    setApplications((current) => current.map((item) => (
+      item.id === application.id ? data as Application : item
+    )));
+    setSavingApplicationId(null);
+    setTrackerMessage(`${application.company} moved to ${stage}.`);
   }
 
   if (loading) return <div className="dashboard-loading">Loading dashboard…</div>;
@@ -408,8 +515,48 @@ function Dashboard() {
       <section className="dashboard-panel applications-panel">
         <div className="panel-heading">
           <div><p className="eyebrow">Tracker</p><h2>Applications</h2></div>
-          <span>{applications.length} records</span>
+          <div className="panel-heading-actions">
+            <span>{applications.length} records</span>
+            <button className="secondary-button" type="button" onClick={() => setShowAddForm((value) => !value)}>
+              {showAddForm ? <X size={15} /> : <Plus size={15} />}
+              {showAddForm ? "Close" : "Add application"}
+            </button>
+          </div>
         </div>
+        {showAddForm && (
+          <form className="application-form" onSubmit={addApplication}>
+            <label>
+              Company
+              <input required value={newApplication.company} onChange={(event) => setNewApplication((value) => ({ ...value, company: event.target.value }))} />
+            </label>
+            <label>
+              Job title
+              <input required value={newApplication.job_title} onChange={(event) => setNewApplication((value) => ({ ...value, job_title: event.target.value }))} />
+            </label>
+            <label className="form-span-2">
+              Job URL
+              <input type="url" value={newApplication.job_url} onChange={(event) => setNewApplication((value) => ({ ...value, job_url: event.target.value }))} />
+            </label>
+            <label>
+              Location
+              <input value={newApplication.location} onChange={(event) => setNewApplication((value) => ({ ...value, location: event.target.value }))} />
+            </label>
+            <label>
+              Date applied
+              <input type="date" value={newApplication.applied_date} onChange={(event) => setNewApplication((value) => ({ ...value, applied_date: event.target.value }))} />
+            </label>
+            <label>
+              Stage
+              <select value={newApplication.stage} onChange={(event) => setNewApplication((value) => ({ ...value, stage: event.target.value as ApplicationStage }))}>
+                {applicationStages.map((stage) => <option value={stage} key={stage}>{stage}</option>)}
+              </select>
+            </label>
+            <button className="primary-button application-submit" type="submit" disabled={savingApplicationId === "new"}>
+              {savingApplicationId === "new" ? "Saving…" : "Save application"}
+            </button>
+          </form>
+        )}
+        {trackerMessage && <p className="tracker-message" aria-live="polite">{trackerMessage}</p>}
         {applications.length ? (
           <div className="table-wrap">
             <table>
@@ -419,7 +566,17 @@ function Dashboard() {
                   <tr key={application.id}>
                     <td>{application.company}</td>
                     <td>{application.job_url ? <a href={application.job_url} target="_blank" rel="noreferrer">{application.job_title}</a> : application.job_title}</td>
-                    <td><span className="stage-pill">{application.stage}</span></td>
+                    <td>
+                      <select
+                        className="stage-select"
+                        value={application.stage}
+                        disabled={savingApplicationId === application.id}
+                        aria-label={`Stage for ${application.company} ${application.job_title}`}
+                        onChange={(event) => void updateApplicationStage(application, event.target.value as ApplicationStage)}
+                      >
+                        {applicationStages.map((stage) => <option value={stage} key={stage}>{stage}</option>)}
+                      </select>
+                    </td>
                     <td>{application.applied_date ?? "—"}</td>
                     <td>{application.next_action ?? "—"}</td>
                   </tr>
