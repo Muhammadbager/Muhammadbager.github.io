@@ -194,6 +194,8 @@ td a { text-decoration-color: #b88b9a; }
 .login-card form { display: grid; gap: 10px; margin-top: 28px; }
 .login-card label { font: 500 10px "DM Mono", monospace; text-transform: uppercase; }
 .login-card input { min-height: 48px; padding: 0 13px; border: 1px solid #bcb3ad; background: #fbf8f4; }
+.login-card input#dashboard-code { font-family: "DM Mono", monospace; font-size: 20px; letter-spacing: .18em; }
+.login-card button:disabled { cursor: wait; opacity: .6; }
 .form-message { font-size: 12px; }
 .dashboard-loading { display: grid; place-items: center; min-height: 100vh; }
 

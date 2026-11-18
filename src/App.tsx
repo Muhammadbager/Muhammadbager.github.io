@@ -313,6 +313,9 @@ function Dashboard() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState(profile.email);
+  const [otp, setOtp] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
+  const [authBusy, setAuthBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [applications, setApplications] = useState<Application[]>([]);
   const [matches, setMatches] = useState<JobMatch[]>([]);
@@ -376,21 +379,50 @@ function Dashboard() {
     ["Recruiter Screen", "Technical Interview", "Final Interview"].includes(application.stage),
   ).length;
 
-  async function sendMagicLink(event: FormEvent) {
+  async function sendSignInCode(event: FormEvent) {
     event.preventDefault();
     if (!supabase) return;
     if (email.trim().toLowerCase() !== profile.email.toLowerCase()) {
       setMessage("This dashboard is restricted to the owner email address.");
       return;
     }
-    setMessage("Sending secure sign-in link…");
+    setAuthBusy(true);
+    setMessage("Sending your one-time code…");
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
-      options: {
-        emailRedirectTo: `${window.location.origin}${window.location.pathname}?auth=dashboard`,
-      },
+      options: { shouldCreateUser: false },
     });
-    setMessage(error ? error.message : "Check your email for the secure sign-in link.");
+    setAuthBusy(false);
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+    setCodeSent(true);
+    setMessage("Code sent. Enter it below to finish signing in on this tab.");
+  }
+
+  async function verifySignInCode(event: FormEvent) {
+    event.preventDefault();
+    if (!supabase) return;
+    const token = otp.replace(/\s/g, "");
+    if (!/^\d{6,8}$/.test(token)) {
+      setMessage("Enter the numeric code from your email.");
+      return;
+    }
+    setAuthBusy(true);
+    setMessage("Verifying your code…");
+    const { data, error } = await supabase.auth.verifyOtp({
+      email: email.trim(),
+      token,
+      type: "email",
+    });
+    setAuthBusy(false);
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+    if (data.session) setSession(data.session);
+    window.history.replaceState(null, "", `${window.location.pathname}#dashboard`);
   }
 
   async function addApplication(event: FormEvent) {
@@ -557,18 +589,52 @@ function Dashboard() {
           <LockKeyhole size={28} />
           <p className="eyebrow">Owner access</p>
           <h1>Sign in to your career dashboard</h1>
-          <p>A one-time link will be sent to your authorized email address.</p>
-          <form onSubmit={sendMagicLink}>
-            <label htmlFor="dashboard-email">Email address</label>
-            <input
-              id="dashboard-email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-            />
-            <button className="primary-button" type="submit">Send secure link</button>
-          </form>
+          <p>Enter the one-time code from your email to sign in without opening another dashboard tab.</p>
+          {!codeSent ? (
+            <form onSubmit={sendSignInCode}>
+              <label htmlFor="dashboard-email">Email address</label>
+              <input
+                id="dashboard-email"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                autoComplete="email"
+                required
+              />
+              <button className="primary-button" type="submit" disabled={authBusy}>
+                {authBusy ? "Sending…" : "Email me a sign-in code"}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={verifySignInCode}>
+              <label htmlFor="dashboard-code">One-time code</label>
+              <input
+                id="dashboard-code"
+                type="text"
+                value={otp}
+                onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 8))}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="Enter code"
+                autoFocus
+                required
+              />
+              <button className="primary-button" type="submit" disabled={authBusy}>
+                {authBusy ? "Verifying…" : "Verify and sign in"}
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => {
+                  setCodeSent(false);
+                  setOtp("");
+                  setMessage("");
+                }}
+              >
+                Start over
+              </button>
+            </form>
+          )}
           {message && <p className="form-message" aria-live="polite">{message}</p>}
         </div>
       </DashboardFrame>
