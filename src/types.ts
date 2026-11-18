@@ -23,7 +23,9 @@ export interface Application {
   applied_date: string | null;
   stage: ApplicationStage;
   source: string | null;
+  application_method: string | null;
   resume_name: string | null;
+  notes: string | null;
   next_action: string | null;
   updated_at: string;
 }

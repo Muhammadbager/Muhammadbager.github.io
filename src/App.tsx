@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import type { Session } from "@supabase/supabase-js";
 import {
@@ -55,6 +55,51 @@ const chartStages: ApplicationStage[] = [
   "Rejected",
   "Accepted",
 ];
+
+const applicationMethods = [
+  "Company Website",
+  "Job Board",
+  "LinkedIn",
+  "Email from Recruiter",
+  "Referral",
+  "Conference / Career Fair",
+];
+
+const jobSources = [
+  "Simplify GitHub",
+  "LILO Discord",
+  "Company Website",
+  "LinkedIn",
+  "Google",
+];
+
+interface ApplicationDraft {
+  company: string;
+  job_title: string;
+  job_url: string;
+  location: string;
+  applied_date: string;
+  stage: ApplicationStage;
+  resume_name: string;
+  application_method: string;
+  source: string;
+  next_action: string;
+  notes: string;
+}
+
+const createApplicationDraft = (): ApplicationDraft => ({
+  company: "",
+  job_title: "",
+  job_url: "",
+  location: "Greater Seattle Area",
+  applied_date: new Date().toISOString().slice(0, 10),
+  stage: "Applied",
+  resume_name: "Muhammadbager_Al-Ali_Resume.pdf",
+  application_method: "Job Board",
+  source: "LinkedIn",
+  next_action: "",
+  notes: "",
+});
 
 function App() {
   const isDashboardRoute = () =>
@@ -261,16 +306,11 @@ function Dashboard() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [matches, setMatches] = useState<JobMatch[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingApplicationId, setEditingApplicationId] = useState<string | null>(null);
+  const [editApplication, setEditApplication] = useState<ApplicationDraft | null>(null);
   const [savingApplicationId, setSavingApplicationId] = useState<string | null>(null);
   const [trackerMessage, setTrackerMessage] = useState("");
-  const [newApplication, setNewApplication] = useState({
-    company: "",
-    job_title: "",
-    job_url: "",
-    location: "Greater Seattle Area",
-    applied_date: new Date().toISOString().slice(0, 10),
-    stage: "Applied" as ApplicationStage,
-  });
+  const [newApplication, setNewApplication] = useState<ApplicationDraft>(createApplicationDraft);
 
   useEffect(() => {
     if (!supabase) {
@@ -355,7 +395,11 @@ function Dashboard() {
       location: newApplication.location.trim() || null,
       applied_date: newApplication.applied_date || null,
       stage: newApplication.stage,
-      source: "Manual",
+      source: newApplication.source || null,
+      application_method: newApplication.application_method || null,
+      resume_name: newApplication.resume_name.trim() || null,
+      next_action: newApplication.next_action.trim() || null,
+      notes: newApplication.notes.trim() || null,
       updated_at: new Date().toISOString(),
     };
     const { data, error } = await supabase
@@ -376,14 +420,7 @@ function Dashboard() {
       stage: data.stage,
     });
     setApplications((current) => [data as Application, ...current]);
-    setNewApplication({
-      company: "",
-      job_title: "",
-      job_url: "",
-      location: "Greater Seattle Area",
-      applied_date: new Date().toISOString().slice(0, 10),
-      stage: "Applied",
-    });
+    setNewApplication(createApplicationDraft());
     setShowAddForm(false);
     setSavingApplicationId(null);
     setTrackerMessage("Application added.");
@@ -417,6 +454,67 @@ function Dashboard() {
     )));
     setSavingApplicationId(null);
     setTrackerMessage(`${application.company} moved to ${stage}.`);
+  }
+
+  function beginEditingApplication(application: Application) {
+    if (editingApplicationId === application.id) {
+      setEditingApplicationId(null);
+      setEditApplication(null);
+      return;
+    }
+    setEditingApplicationId(application.id);
+    setEditApplication({
+      company: application.company,
+      job_title: application.job_title,
+      job_url: application.job_url ?? "",
+      location: application.location ?? "",
+      applied_date: application.applied_date ?? "",
+      stage: application.stage,
+      resume_name: application.resume_name ?? "",
+      application_method: application.application_method ?? "",
+      source: application.source ?? "",
+      next_action: application.next_action ?? "",
+      notes: application.notes ?? "",
+    });
+  }
+
+  async function saveApplicationDetails(event: FormEvent) {
+    event.preventDefault();
+    if (!supabase || !editingApplicationId || !editApplication) return;
+    setSavingApplicationId(editingApplicationId);
+    setTrackerMessage("");
+    const { data, error } = await supabase
+      .from("applications")
+      .update({
+        company: editApplication.company.trim(),
+        job_title: editApplication.job_title.trim(),
+        job_url: editApplication.job_url.trim() || null,
+        location: editApplication.location.trim() || null,
+        applied_date: editApplication.applied_date || null,
+        resume_name: editApplication.resume_name.trim() || null,
+        application_method: editApplication.application_method || null,
+        source: editApplication.source || null,
+        next_action: editApplication.next_action.trim() || null,
+        notes: editApplication.notes.trim() || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", editingApplicationId)
+      .select("*")
+      .single();
+
+    if (error || !data) {
+      setTrackerMessage(error?.message ?? "The application details could not be saved.");
+      setSavingApplicationId(null);
+      return;
+    }
+
+    setApplications((current) => current.map((item) => (
+      item.id === editingApplicationId ? data as Application : item
+    )));
+    setEditingApplicationId(null);
+    setEditApplication(null);
+    setSavingApplicationId(null);
+    setTrackerMessage(`${data.company} details saved.`);
   }
 
   if (loading) return <div className="dashboard-loading">Loading dashboard…</div>;
@@ -551,35 +649,92 @@ function Dashboard() {
                 {applicationStages.map((stage) => <option value={stage} key={stage}>{stage}</option>)}
               </select>
             </label>
+            <label>
+              Resume used
+              <input list="resume-options" value={newApplication.resume_name} onChange={(event) => setNewApplication((value) => ({ ...value, resume_name: event.target.value }))} />
+            </label>
+            <label>
+              Application method
+              <select value={newApplication.application_method} onChange={(event) => setNewApplication((value) => ({ ...value, application_method: event.target.value }))}>
+                <option value="">Not recorded</option>
+                {applicationMethods.map((method) => <option value={method} key={method}>{method}</option>)}
+              </select>
+            </label>
+            <label>
+              Where job was found
+              <select value={newApplication.source} onChange={(event) => setNewApplication((value) => ({ ...value, source: event.target.value }))}>
+                <option value="">Not recorded</option>
+                {jobSources.map((source) => <option value={source} key={source}>{source}</option>)}
+              </select>
+            </label>
+            <label>
+              Next action
+              <input value={newApplication.next_action} onChange={(event) => setNewApplication((value) => ({ ...value, next_action: event.target.value }))} placeholder="Follow up, prepare for OA…" />
+            </label>
+            <label className="form-span-2">
+              Additional notes
+              <textarea rows={3} value={newApplication.notes} onChange={(event) => setNewApplication((value) => ({ ...value, notes: event.target.value }))} />
+            </label>
             <button className="primary-button application-submit" type="submit" disabled={savingApplicationId === "new"}>
               {savingApplicationId === "new" ? "Saving…" : "Save application"}
             </button>
+            <datalist id="resume-options">
+              <option value="Muhammadbager_Al-Ali_Resume.pdf" />
+              <option value="Muhammad_s_Resume-2.pdf" />
+              <option value="Custom resume" />
+            </datalist>
           </form>
         )}
         {trackerMessage && <p className="tracker-message" aria-live="polite">{trackerMessage}</p>}
         {applications.length ? (
           <div className="table-wrap">
             <table>
-              <thead><tr><th>Company</th><th>Role</th><th>Stage</th><th>Applied</th><th>Next action</th></tr></thead>
+              <thead><tr><th>Company</th><th>Role</th><th>Stage</th><th>Applied</th><th>Next action</th><th>Details</th></tr></thead>
               <tbody>
                 {applications.map((application) => (
-                  <tr key={application.id}>
-                    <td>{application.company}</td>
-                    <td>{application.job_url ? <a href={application.job_url} target="_blank" rel="noreferrer">{application.job_title}</a> : application.job_title}</td>
-                    <td>
-                      <select
-                        className="stage-select"
-                        value={application.stage}
-                        disabled={savingApplicationId === application.id}
-                        aria-label={`Stage for ${application.company} ${application.job_title}`}
-                        onChange={(event) => void updateApplicationStage(application, event.target.value as ApplicationStage)}
-                      >
-                        {applicationStages.map((stage) => <option value={stage} key={stage}>{stage}</option>)}
-                      </select>
-                    </td>
-                    <td>{application.applied_date ?? "—"}</td>
-                    <td>{application.next_action ?? "—"}</td>
-                  </tr>
+                  <Fragment key={application.id}>
+                    <tr>
+                      <td>{application.company}</td>
+                      <td>{application.job_url ? <a href={application.job_url} target="_blank" rel="noreferrer">{application.job_title}</a> : application.job_title}</td>
+                      <td>
+                        <select
+                          className="stage-select"
+                          value={application.stage}
+                          disabled={savingApplicationId === application.id}
+                          aria-label={`Stage for ${application.company} ${application.job_title}`}
+                          onChange={(event) => void updateApplicationStage(application, event.target.value as ApplicationStage)}
+                        >
+                          {applicationStages.map((stage) => <option value={stage} key={stage}>{stage}</option>)}
+                        </select>
+                      </td>
+                      <td>{application.applied_date ?? "—"}</td>
+                      <td>{application.next_action ?? "—"}</td>
+                      <td><button className="table-action" type="button" onClick={() => beginEditingApplication(application)}>{editingApplicationId === application.id ? "Close" : "Edit"}</button></td>
+                    </tr>
+                    {editingApplicationId === application.id && editApplication && (
+                      <tr className="application-edit-row">
+                        <td colSpan={6}>
+                          <form className="application-form" onSubmit={saveApplicationDetails}>
+                            <label>Company<input required value={editApplication.company} onChange={(event) => setEditApplication((value) => value && ({ ...value, company: event.target.value }))} /></label>
+                            <label>Job title<input required value={editApplication.job_title} onChange={(event) => setEditApplication((value) => value && ({ ...value, job_title: event.target.value }))} /></label>
+                            <label className="form-span-2">Job URL<input type="url" value={editApplication.job_url} onChange={(event) => setEditApplication((value) => value && ({ ...value, job_url: event.target.value }))} /></label>
+                            <label>Location<input value={editApplication.location} onChange={(event) => setEditApplication((value) => value && ({ ...value, location: event.target.value }))} /></label>
+                            <label>Date applied<input type="date" value={editApplication.applied_date} onChange={(event) => setEditApplication((value) => value && ({ ...value, applied_date: event.target.value }))} /></label>
+                            <label>Resume used<input list="edit-resume-options" value={editApplication.resume_name} onChange={(event) => setEditApplication((value) => value && ({ ...value, resume_name: event.target.value }))} /></label>
+                            <label>Application method<select value={editApplication.application_method} onChange={(event) => setEditApplication((value) => value && ({ ...value, application_method: event.target.value }))}><option value="">Not recorded</option>{applicationMethods.map((method) => <option value={method} key={method}>{method}</option>)}</select></label>
+                            <label>Where job was found<select value={editApplication.source} onChange={(event) => setEditApplication((value) => value && ({ ...value, source: event.target.value }))}><option value="">Not recorded</option>{jobSources.map((source) => <option value={source} key={source}>{source}</option>)}</select></label>
+                            <label>Next action<input value={editApplication.next_action} onChange={(event) => setEditApplication((value) => value && ({ ...value, next_action: event.target.value }))} /></label>
+                            <label className="form-span-2">Additional notes<textarea rows={3} value={editApplication.notes} onChange={(event) => setEditApplication((value) => value && ({ ...value, notes: event.target.value }))} /></label>
+                            <div className="form-actions form-span-2">
+                              <button className="primary-button" type="submit" disabled={savingApplicationId === application.id}>{savingApplicationId === application.id ? "Saving…" : "Save details"}</button>
+                              <button className="secondary-button" type="button" onClick={() => beginEditingApplication(application)}>Cancel</button>
+                            </div>
+                            <datalist id="edit-resume-options"><option value="Muhammadbager_Al-Ali_Resume.pdf" /><option value="Muhammad_s_Resume-2.pdf" /><option value="Custom resume" /></datalist>
+                          </form>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
