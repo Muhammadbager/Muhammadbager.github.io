@@ -78,6 +78,7 @@ interface ApplicationDraft {
   job_title: string;
   job_url: string;
   location: string;
+  listing_date: string;
   applied_date: string;
   stage: ApplicationStage;
   resume_name: string;
@@ -92,6 +93,7 @@ const createApplicationDraft = (): ApplicationDraft => ({
   job_title: "",
   job_url: "",
   location: "Greater Seattle Area",
+  listing_date: "",
   applied_date: new Date().toISOString().slice(0, 10),
   stage: "Applied",
   resume_name: "Muhammadbager_Al-Ali_Resume.pdf",
@@ -100,6 +102,15 @@ const createApplicationDraft = (): ApplicationDraft => ({
   next_action: "",
   notes: "",
 });
+
+function daysToApply(listingDate: string | null, appliedDate: string | null) {
+  if (!listingDate || !appliedDate) return "—";
+  const listed = Date.parse(`${listingDate}T00:00:00Z`);
+  const applied = Date.parse(`${appliedDate}T00:00:00Z`);
+  if (Number.isNaN(listed) || Number.isNaN(applied)) return "—";
+  const days = Math.round((applied - listed) / 86_400_000);
+  return `${days} ${Math.abs(days) === 1 ? "day" : "days"}`;
+}
 
 function App() {
   const isDashboardRoute = () =>
@@ -393,6 +404,7 @@ function Dashboard() {
       job_title: newApplication.job_title.trim(),
       job_url: newApplication.job_url.trim() || null,
       location: newApplication.location.trim() || null,
+      listing_date: newApplication.listing_date || null,
       applied_date: newApplication.applied_date || null,
       stage: newApplication.stage,
       source: newApplication.source || null,
@@ -468,6 +480,7 @@ function Dashboard() {
       job_title: application.job_title,
       job_url: application.job_url ?? "",
       location: application.location ?? "",
+      listing_date: application.listing_date ?? "",
       applied_date: application.applied_date ?? "",
       stage: application.stage,
       resume_name: application.resume_name ?? "",
@@ -490,6 +503,7 @@ function Dashboard() {
         job_title: editApplication.job_title.trim(),
         job_url: editApplication.job_url.trim() || null,
         location: editApplication.location.trim() || null,
+        listing_date: editApplication.listing_date || null,
         applied_date: editApplication.applied_date || null,
         resume_name: editApplication.resume_name.trim() || null,
         application_method: editApplication.application_method || null,
@@ -640,6 +654,10 @@ function Dashboard() {
               <input value={newApplication.location} onChange={(event) => setNewApplication((value) => ({ ...value, location: event.target.value }))} />
             </label>
             <label>
+              Date published
+              <input type="date" value={newApplication.listing_date} onChange={(event) => setNewApplication((value) => ({ ...value, listing_date: event.target.value }))} />
+            </label>
+            <label>
               Date applied
               <input type="date" value={newApplication.applied_date} onChange={(event) => setNewApplication((value) => ({ ...value, applied_date: event.target.value }))} />
             </label>
@@ -689,7 +707,7 @@ function Dashboard() {
         {applications.length ? (
           <div className="table-wrap">
             <table>
-              <thead><tr><th>Company</th><th>Role</th><th>Stage</th><th>Applied</th><th>Next action</th><th>Details</th></tr></thead>
+              <thead><tr><th>Company</th><th>Role</th><th>Stage</th><th>Published</th><th>Applied</th><th>Days to apply</th><th>Method</th><th>Found via</th><th>Next action</th><th>Details</th></tr></thead>
               <tbody>
                 {applications.map((application) => (
                   <Fragment key={application.id}>
@@ -707,18 +725,23 @@ function Dashboard() {
                           {applicationStages.map((stage) => <option value={stage} key={stage}>{stage}</option>)}
                         </select>
                       </td>
+                      <td>{application.listing_date ?? "—"}</td>
                       <td>{application.applied_date ?? "—"}</td>
+                      <td>{daysToApply(application.listing_date, application.applied_date)}</td>
+                      <td>{application.application_method ?? "—"}</td>
+                      <td>{application.source ?? "—"}</td>
                       <td>{application.next_action ?? "—"}</td>
                       <td><button className="table-action" type="button" onClick={() => beginEditingApplication(application)}>{editingApplicationId === application.id ? "Close" : "Edit"}</button></td>
                     </tr>
                     {editingApplicationId === application.id && editApplication && (
                       <tr className="application-edit-row">
-                        <td colSpan={6}>
+                        <td colSpan={10}>
                           <form className="application-form" onSubmit={saveApplicationDetails}>
                             <label>Company<input required value={editApplication.company} onChange={(event) => setEditApplication((value) => value && ({ ...value, company: event.target.value }))} /></label>
                             <label>Job title<input required value={editApplication.job_title} onChange={(event) => setEditApplication((value) => value && ({ ...value, job_title: event.target.value }))} /></label>
                             <label className="form-span-2">Job URL<input type="url" value={editApplication.job_url} onChange={(event) => setEditApplication((value) => value && ({ ...value, job_url: event.target.value }))} /></label>
                             <label>Location<input value={editApplication.location} onChange={(event) => setEditApplication((value) => value && ({ ...value, location: event.target.value }))} /></label>
+                            <label>Date published<input type="date" value={editApplication.listing_date} onChange={(event) => setEditApplication((value) => value && ({ ...value, listing_date: event.target.value }))} /></label>
                             <label>Date applied<input type="date" value={editApplication.applied_date} onChange={(event) => setEditApplication((value) => value && ({ ...value, applied_date: event.target.value }))} /></label>
                             <label>Resume used<input list="edit-resume-options" value={editApplication.resume_name} onChange={(event) => setEditApplication((value) => value && ({ ...value, resume_name: event.target.value }))} /></label>
                             <label>Application method<select value={editApplication.application_method} onChange={(event) => setEditApplication((value) => value && ({ ...value, application_method: event.target.value }))}><option value="">Not recorded</option>{applicationMethods.map((method) => <option value={method} key={method}>{method}</option>)}</select></label>

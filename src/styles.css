@@ -177,7 +177,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .form-actions { display: flex; align-items: center; gap: 10px; }
 .tracker-message { margin: -5px 0 18px; color: var(--rose-dark); font-size: 12px; }
 .table-wrap { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+table { width: 100%; min-width: 1280px; border-collapse: collapse; font-size: 12px; }
 th { padding: 12px 14px; background: #f6f1ec; text-align: left; font: 500 9px "DM Mono", monospace; text-transform: uppercase; letter-spacing: .08em; }
 td { padding: 16px 14px; border-bottom: 1px solid #eee7e0; }
 td a { text-decoration-color: #b88b9a; }
