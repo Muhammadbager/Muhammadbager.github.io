@@ -20,7 +20,7 @@ Private application records and resume source files are intentionally excluded f
 
 ## Job discovery
 
-The `Greater Seattle Job Watch` workflow runs at 8:00 AM and 8:00 PM in the `America/Los_Angeles` timezone. It filters the public Simplify new-grad list for entry-level software roles in the Greater Seattle area, excludes remote and senior roles, stores new matches privately, and sends a Discord digest.
+The `Greater Seattle Job Watch` workflow runs at 8:00 AM and 8:00 PM in the `America/Los_Angeles` timezone. It filters the public Simplify new-grad list for explicitly bachelor-level early-career software roles in the Greater Seattle area. Titles must signal new grad, university/recent graduate, entry level, junior, Engineer I/SDE I, a 2026 start, or zero-to-two years of experience. It excludes remote, internship, PhD/doctoral, research-track, mid-level, senior+, and 2027-start roles, stores exact matches privately, and sends a Discord digest only for newly discovered roles.
 
 It activates after these repository secrets are configured:
 
