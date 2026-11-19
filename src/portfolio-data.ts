@@ -78,7 +78,7 @@ export const projects = [
       "A team-built language model that returned the three most likely next characters for a given text input.",
     highlights: [
       "Experimented with n-grams, LSTMs, and Transformers using Kneser–Ney smoothing, AdamW, learning-rate scheduling, and early stopping.",
-      "Improved top-three prediction accuracy from 9.4% to 34.1%—about 3.6×—on more than 20 million Wikipedia characters while reducing runtime.",
+      "Improved top-three prediction accuracy by about 3.6× on more than 20 million Wikipedia characters while reducing runtime.",
       "Contributed across implementation, optimizer tuning, parameter testing, and debugging with Cursor; validated the final model in the course Docker environment.",
     ],
     tools: ["Python", "PyTorch", "Kneser–Ney", "AdamW", "Docker", "NLP"],
