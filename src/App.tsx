@@ -252,6 +252,11 @@ function Portfolio() {
                       </div>
                     </div>
                     <p>{project.description}</p>
+                    <ul className="project-highlights">
+                      {project.highlights.map((highlight) => (
+                        <li key={highlight}>{highlight}</li>
+                      ))}
+                    </ul>
                     <p className="project-stack">{project.tools.join(" · ")}</p>
                     {"availability" in project && project.availability && (
                       <p className="project-note">{project.availability}</p>
