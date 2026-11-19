@@ -92,6 +92,18 @@ export const projects = [
     links: [],
     availability: "Course project — source available on request",
   },
+  {
+    index: "06",
+    title: "SkillSnap",
+    type: "Full-stack portfolio platform",
+    description:
+      "A Blazor portfolio and project tracker with authenticated CRUD workflows, role-aware API security, client session state, and cached EF Core queries.",
+    tools: ["Blazor WebAssembly", "ASP.NET Core", "EF Core", "SQLite", "JWT"],
+    links: [
+      { label: "Code", href: "https://github.com/Muhammadbager/skillsnap" },
+    ],
+    availability: "Local demo — public deployment planned",
+  },
 ];
 
 export const skills = [
