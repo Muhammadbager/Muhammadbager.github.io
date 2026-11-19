@@ -170,7 +170,7 @@ function Portfolio() {
           <h1>{profile.name}</h1>
           <p className="minimal-lead">
             I’m a software engineer focused on backend systems, applied AI, and
-            full-stack product work.
+            machine learning.
           </p>
           <p className="minimal-copy">
             I studied Computer Science at the University of Washington and
