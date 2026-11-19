@@ -86,16 +86,6 @@ export const projects = [
   },
   {
     index: "05",
-    title: "CampusMaps Friends",
-    type: "Software design",
-    description:
-      "Friend-management APIs, spatial search utilities, and React components for viewing nearby friends and routes.",
-    tools: ["React", "TypeScript", "Node.js", "Spatial search"],
-    links: [],
-    availability: "Course project — source available on request",
-  },
-  {
-    index: "06",
     title: "SkillSnap",
     type: "Full-stack portfolio platform",
     description:
