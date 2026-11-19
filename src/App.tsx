@@ -2,7 +2,6 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import type { Session } from "@supabase/supabase-js";
 import {
-  ArrowDownRight,
   ArrowUpRight,
   BriefcaseBusiness,
   Download,
@@ -160,6 +159,34 @@ function App() {
 function Portfolio() {
   const [menuOpen, setMenuOpen] = useState(false);
 
+  useEffect(() => {
+    const elements = Array.from(
+      document.querySelectorAll<HTMLElement>("[data-reveal]"),
+    );
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+
+    if (prefersReducedMotion || !("IntersectionObserver" in window)) {
+      elements.forEach((element) => element.classList.add("is-visible"));
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add("is-visible");
+          observer.unobserve(entry.target);
+        });
+      },
+      { rootMargin: "0px 0px -8%", threshold: 0.12 },
+    );
+
+    elements.forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div className="site-shell">
       <header className="site-header">
@@ -168,15 +195,16 @@ function Portfolio() {
           <strong>Muhammadbager Al-Ali</strong>
         </a>
         <button
-          className="menu-button"
+          className={menuOpen ? "menu-button is-open" : "menu-button"}
           type="button"
-          aria-label="Toggle navigation"
+          aria-label={menuOpen ? "Close navigation" : "Open navigation"}
           aria-expanded={menuOpen}
+          aria-controls="site-navigation"
           onClick={() => setMenuOpen((value) => !value)}
         >
           {menuOpen ? <X /> : <Menu />}
         </button>
-        <nav className={menuOpen ? "nav-links is-open" : "nav-links"}>
+        <nav id="site-navigation" className={menuOpen ? "nav-links is-open" : "nav-links"}>
           <a href="#experience" onClick={() => setMenuOpen(false)}>Experience</a>
           <a href="#projects" onClick={() => setMenuOpen(false)}>Projects</a>
           <a href="#contact" onClick={() => setMenuOpen(false)}>Contact</a>
@@ -192,21 +220,21 @@ function Portfolio() {
             <span className="status-dot" /> Available for entry-level roles
           </div>
           <h1 className="reveal reveal-delay-1">
-            Software that makes
-            <span> complex systems useful.</span>
+            Backend systems and applied AI,
+            <span> built for real use.</span>
           </h1>
           <div className="hero-bottom reveal reveal-delay-2">
             <p>
-              I’m Muhammadbager, a Seattle-based software engineer building
-              dependable backend systems, thoughtful product experiences, and
-              applied AI tools.
+              I’m Muhammadbager, a Seattle-based software engineer working
+              across APIs, data systems, and product-facing AI. I care about
+              reliable behavior, clear interfaces, and shipping the whole path.
             </p>
             <div className="hero-actions">
               <a className="primary-button" href="#projects">
-                Explore my work <ArrowDownRight size={18} />
+                Explore my work
               </a>
               <a className="text-link" href={`mailto:${profile.email}`}>
-                Start a conversation <ArrowUpRight size={16} />
+                Start a conversation
               </a>
             </div>
           </div>
@@ -232,7 +260,7 @@ function Portfolio() {
 
         <section className="statement section-pad" aria-label="Professional statement">
           <p className="eyebrow">How I work</p>
-          <p className="statement-copy">
+          <p className="statement-copy" data-reveal>
             I like the point where <em>systems thinking</em> meets product
             judgment—turning APIs, data, and models into software people can
             actually rely on.
@@ -241,12 +269,12 @@ function Portfolio() {
 
         <section id="experience" className="section-pad split-section">
           <div className="section-heading">
-            <p className="eyebrow">01 / Experience</p>
+            <p className="eyebrow">Experience</p>
             <h2>Building across the stack.</h2>
           </div>
           <div className="timeline">
             {experience.map((item) => (
-              <article className="timeline-item" key={`${item.role}-${item.period}`}>
+              <article className="timeline-item" data-reveal key={`${item.role}-${item.period}`}>
                 <p className="timeline-period">{item.period}</p>
                 <div>
                   <h3>{item.role}</h3>
@@ -264,21 +292,27 @@ function Portfolio() {
         <section id="projects" className="projects-section section-pad">
           <div className="section-heading projects-heading">
             <div>
-              <p className="eyebrow">02 / Selected work</p>
-              <h2>Projects with a point of view.</h2>
+              <p className="eyebrow">Selected work</p>
+              <h2>Selected engineering work.</h2>
             </div>
             <a className="text-link" href={profile.github} target="_blank" rel="noreferrer">
-              All repositories <ArrowUpRight size={16} />
+              All repositories
             </a>
           </div>
           <div className="project-list">
             {projects.map((project) => (
-              <article className="project-card" key={project.title}>
-                <span className="project-index">{project.index}</span>
-                <div className="project-main">
+              <article className="project-card" data-reveal key={project.title}>
+                <div className="project-heading-group">
                   <p className="project-type">{project.type}</p>
                   <h3>{project.title}</h3>
+                </div>
+                <div className="project-summary">
                   <p>{project.description}</p>
+                  {"availability" in project && project.availability && (
+                    <p className="project-availability">{project.availability}</p>
+                  )}
+                </div>
+                <div className="project-meta">
                   <ul className="tool-list">
                     {project.tools.map((tool) => <li key={tool}>{tool}</li>)}
                   </ul>
@@ -286,13 +320,10 @@ function Portfolio() {
                     <div className="project-links" aria-label={`${project.title} links`}>
                       {project.links.map((link) => (
                         <a href={link.href} target="_blank" rel="noreferrer" key={link.label}>
-                          {link.label} <ArrowUpRight size={14} />
+                          {link.label}
                         </a>
                       ))}
                     </div>
-                  )}
-                  {"availability" in project && project.availability && (
-                    <p className="project-availability">{project.availability}</p>
                   )}
                 </div>
               </article>
@@ -302,19 +333,19 @@ function Portfolio() {
 
         <section className="skills-section section-pad">
           <div className="section-heading">
-            <p className="eyebrow">03 / Toolkit</p>
+            <p className="eyebrow">Toolkit</p>
             <h2>Technologies I use to ship.</h2>
           </div>
-          <div className="skills-grid">
-            {skills.map((skill, index) => (
-              <span key={skill}><small>{String(index + 1).padStart(2, "0")}</small>{skill}</span>
+          <div className="skills-grid" data-reveal>
+            {skills.map((skill) => (
+              <span key={skill}>{skill}</span>
             ))}
           </div>
         </section>
 
         <section id="contact" className="contact-section section-pad">
-          <p className="eyebrow">04 / Let’s talk</p>
-          <h2>Looking for an engineer who can move between systems and product?</h2>
+          <p className="eyebrow">Let’s talk</p>
+          <h2>Let’s build something dependable.</h2>
           <p>
             I’m pursuing entry-level software engineering opportunities in the
             Greater Seattle area.
