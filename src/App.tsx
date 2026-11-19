@@ -4,14 +4,9 @@ import type { Session } from "@supabase/supabase-js";
 import {
   ArrowUpRight,
   BriefcaseBusiness,
-  Download,
-  Github,
-  Linkedin,
   LockKeyhole,
   LogOut,
-  Mail,
   MapPin,
-  Menu,
   Plus,
   X,
 } from "lucide-react";
@@ -157,211 +152,154 @@ function App() {
 }
 
 function Portfolio() {
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [openSections, setOpenSections] = useState({
+    experience: false,
+    projects: false,
+    toolkit: false,
+  });
 
-  useEffect(() => {
-    const elements = Array.from(
-      document.querySelectorAll<HTMLElement>("[data-reveal]"),
-    );
-    const prefersReducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
-
-    if (prefersReducedMotion || !("IntersectionObserver" in window)) {
-      elements.forEach((element) => element.classList.add("is-visible"));
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (!entry.isIntersecting) return;
-          entry.target.classList.add("is-visible");
-          observer.unobserve(entry.target);
-        });
-      },
-      { rootMargin: "0px 0px -8%", threshold: 0.12 },
-    );
-
-    elements.forEach((element) => observer.observe(element));
-    return () => observer.disconnect();
-  }, []);
+  const toggleSection = (section: keyof typeof openSections) => {
+    setOpenSections((current) => ({ ...current, [section]: !current[section] }));
+  };
 
   return (
-    <div className="site-shell">
-      <header className="site-header">
-        <a className="wordmark" href="#top" aria-label="Home">
-          <span>MA</span>
-          <strong>Muhammadbager Al-Ali</strong>
-        </a>
-        <button
-          className={menuOpen ? "menu-button is-open" : "menu-button"}
-          type="button"
-          aria-label={menuOpen ? "Close navigation" : "Open navigation"}
-          aria-expanded={menuOpen}
-          aria-controls="site-navigation"
-          onClick={() => setMenuOpen((value) => !value)}
-        >
-          {menuOpen ? <X /> : <Menu />}
-        </button>
-        <nav id="site-navigation" className={menuOpen ? "nav-links is-open" : "nav-links"}>
-          <a href="#experience" onClick={() => setMenuOpen(false)}>Experience</a>
-          <a href="#projects" onClick={() => setMenuOpen(false)}>Projects</a>
-          <a href="#contact" onClick={() => setMenuOpen(false)}>Contact</a>
-          <a className="nav-resume" href={profile.resume} download>
-            Resume <Download size={15} />
-          </a>
-        </nav>
-      </header>
-
-      <main id="top">
-        <section className="hero section-pad">
-          <div className="hero-kicker reveal">
-            <span className="status-dot" /> Available for entry-level roles
-          </div>
-          <h1 className="reveal reveal-delay-1">
-            Backend systems and applied AI,
-            <span> built for real use.</span>
-          </h1>
-          <div className="hero-bottom reveal reveal-delay-2">
-            <p>
-              I’m Muhammadbager, a Seattle-based software engineer working
-              across APIs, data systems, and product-facing AI. I care about
-              reliable behavior, clear interfaces, and shipping the whole path.
-            </p>
-            <div className="hero-actions">
-              <a className="primary-button" href="#projects">
-                Explore my work
-              </a>
-              <a className="text-link" href={`mailto:${profile.email}`}>
-                Start a conversation
-              </a>
-            </div>
-          </div>
-          <div className="hero-grid reveal reveal-delay-3">
-            <div>
-              <span>Education</span>
-              <strong>UW Computer Science</strong>
-            </div>
-            <div>
-              <span>Graduated</span>
-              <strong>June 2026</strong>
-            </div>
-            <div>
-              <span>Based in</span>
-              <strong>Greater Seattle</strong>
-            </div>
-            <div>
-              <span>Focus</span>
-              <strong>Backend + full-stack</strong>
-            </div>
-          </div>
-        </section>
-
-        <section className="statement section-pad" aria-label="Professional statement">
-          <p className="eyebrow">How I work</p>
-          <p className="statement-copy" data-reveal>
-            I like the point where <em>systems thinking</em> meets product
-            judgment—turning APIs, data, and models into software people can
-            actually rely on.
+    <div className="minimal-site-shell">
+      <main className="minimal-page" id="top">
+        <header className="minimal-intro">
+          <p className="minimal-label">{profile.location}</p>
+          <h1>{profile.name}</h1>
+          <p className="minimal-lead">
+            I’m a software engineer focused on backend systems, applied AI, and
+            full-stack product work.
           </p>
-        </section>
+          <p className="minimal-copy">
+            I studied Computer Science at the University of Washington and
+            graduated in June 2026. This site collects selected experience,
+            projects, and the tools I use.
+          </p>
+          <nav className="minimal-links" aria-label="Profile links">
+            <a href={`mailto:${profile.email}`}>Email</a>
+            <a href={profile.github} target="_blank" rel="noreferrer">GitHub</a>
+            <a href={profile.linkedin} target="_blank" rel="noreferrer">LinkedIn</a>
+            <a href={profile.resume} target="_blank" rel="noreferrer">Résumé</a>
+          </nav>
+        </header>
 
-        <section id="experience" className="section-pad split-section">
-          <div className="section-heading">
-            <p className="eyebrow">Experience</p>
-            <h2>Building across the stack.</h2>
-          </div>
-          <div className="timeline">
-            {experience.map((item) => (
-              <article className="timeline-item" data-reveal key={`${item.role}-${item.period}`}>
-                <p className="timeline-period">{item.period}</p>
-                <div>
-                  <h3>{item.role}</h3>
-                  <p className="organization">{item.organization}</p>
-                  <p className="timeline-summary">{item.summary}</p>
-                  <ul>
-                    {item.details.map((detail) => <li key={detail}>{detail}</li>)}
-                  </ul>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section id="projects" className="projects-section section-pad">
-          <div className="section-heading projects-heading">
-            <div>
-              <p className="eyebrow">Selected work</p>
-              <h2>Selected engineering work.</h2>
-            </div>
-            <a className="text-link" href={profile.github} target="_blank" rel="noreferrer">
-              All repositories
-            </a>
-          </div>
-          <div className="project-list">
-            {projects.map((project) => (
-              <article className="project-card" data-reveal key={project.title}>
-                <div className="project-heading-group">
-                  <p className="project-type">{project.type}</p>
-                  <h3>{project.title}</h3>
-                </div>
-                <div className="project-summary">
-                  <p>{project.description}</p>
-                  {"availability" in project && project.availability && (
-                    <p className="project-availability">{project.availability}</p>
-                  )}
-                </div>
-                <div className="project-meta">
-                  <ul className="tool-list">
-                    {project.tools.map((tool) => <li key={tool}>{tool}</li>)}
-                  </ul>
-                  {project.links.length > 0 && (
-                    <div className="project-links" aria-label={`${project.title} links`}>
-                      {project.links.map((link) => (
-                        <a href={link.href} target="_blank" rel="noreferrer" key={link.label}>
-                          {link.label}
-                        </a>
-                      ))}
+        <section className="minimal-section" id="experience">
+          <button
+            className="section-toggle"
+            type="button"
+            aria-expanded={openSections.experience}
+            aria-controls="experience-panel"
+            onClick={() => toggleSection("experience")}
+          >
+            <span>Experience</span>
+            <span className="toggle-mark" aria-hidden="true">{openSections.experience ? "−" : "+"}</span>
+          </button>
+          <div
+            className={openSections.experience ? "collapsible-panel is-open" : "collapsible-panel"}
+            id="experience-panel"
+            aria-hidden={!openSections.experience}
+            inert={!openSections.experience}
+          >
+            <div className="collapsible-inner">
+              <div className="minimal-list">
+                {experience.map((item) => (
+                  <article className="minimal-entry" key={`${item.role}-${item.period}`}>
+                    <div className="entry-heading">
+                      <div>
+                        <h2>{item.role}</h2>
+                        <p>{item.organization}</p>
+                      </div>
+                      <time>{item.period}</time>
                     </div>
-                  )}
-                </div>
-              </article>
-            ))}
+                    <p>{item.summary}</p>
+                    <ul>
+                      {item.details.map((detail) => <li key={detail}>{detail}</li>)}
+                    </ul>
+                  </article>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
 
-        <section className="skills-section section-pad">
-          <div className="section-heading">
-            <p className="eyebrow">Toolkit</p>
-            <h2>Technologies I use to ship.</h2>
-          </div>
-          <div className="skills-grid" data-reveal>
-            {skills.map((skill) => (
-              <span key={skill}>{skill}</span>
-            ))}
+        <section className="minimal-section" id="projects">
+          <button
+            className="section-toggle"
+            type="button"
+            aria-expanded={openSections.projects}
+            aria-controls="projects-panel"
+            onClick={() => toggleSection("projects")}
+          >
+            <span>Projects</span>
+            <span className="toggle-mark" aria-hidden="true">{openSections.projects ? "−" : "+"}</span>
+          </button>
+          <div
+            className={openSections.projects ? "collapsible-panel is-open" : "collapsible-panel"}
+            id="projects-panel"
+            aria-hidden={!openSections.projects}
+            inert={!openSections.projects}
+          >
+            <div className="collapsible-inner">
+              <div className="minimal-list">
+                {projects.map((project) => (
+                  <article className="minimal-entry project-entry" key={project.title}>
+                    <div className="entry-heading">
+                      <div>
+                        <h2>{project.title}</h2>
+                        <p>{project.type}</p>
+                      </div>
+                    </div>
+                    <p>{project.description}</p>
+                    <p className="project-stack">{project.tools.join(" · ")}</p>
+                    {"availability" in project && project.availability && (
+                      <p className="project-note">{project.availability}</p>
+                    )}
+                    {project.links.length > 0 && (
+                      <div className="entry-links" aria-label={`${project.title} links`}>
+                        {project.links.map((link) => (
+                          <a href={link.href} target="_blank" rel="noreferrer" key={link.label}>
+                            {link.label}
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
 
-        <section id="contact" className="contact-section section-pad">
-          <p className="eyebrow">Let’s talk</p>
-          <h2>Let’s build something dependable.</h2>
-          <p>
-            I’m pursuing entry-level software engineering opportunities in the
-            Greater Seattle area.
-          </p>
-          <div className="contact-links">
-            <a href={`mailto:${profile.email}`}><Mail size={18} /> {profile.email}</a>
-            <a href={profile.linkedin} target="_blank" rel="noreferrer"><Linkedin size={18} /> LinkedIn</a>
-            <a href={profile.github} target="_blank" rel="noreferrer"><Github size={18} /> GitHub</a>
+        <section className="minimal-section">
+          <button
+            className="section-toggle"
+            type="button"
+            aria-expanded={openSections.toolkit}
+            aria-controls="toolkit-panel"
+            onClick={() => toggleSection("toolkit")}
+          >
+            <span>Toolkit</span>
+            <span className="toggle-mark" aria-hidden="true">{openSections.toolkit ? "−" : "+"}</span>
+          </button>
+          <div
+            className={openSections.toolkit ? "collapsible-panel is-open" : "collapsible-panel"}
+            id="toolkit-panel"
+            aria-hidden={!openSections.toolkit}
+            inert={!openSections.toolkit}
+          >
+            <div className="collapsible-inner">
+              <p className="minimal-toolkit">{skills.join(" · ")}</p>
+            </div>
           </div>
         </section>
+
+        <footer className="minimal-footer">
+          <a href={`mailto:${profile.email}`}>{profile.email}</a>
+          <a className="owner-link" href="#dashboard"><LockKeyhole size={13} /> Owner</a>
+        </footer>
       </main>
-
-      <footer className="site-footer section-pad">
-        <p>© 2026 Muhammadbager Al-Ali</p>
-        <a href="#dashboard"><LockKeyhole size={14} /> Owner dashboard</a>
-      </footer>
     </div>
   );
 }

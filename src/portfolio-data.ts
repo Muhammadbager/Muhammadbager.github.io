@@ -1,3 +1,5 @@
+const baseUrl = import.meta.env.BASE_URL;
+
 export const profile = {
   name: "Muhammadbager Al-Ali",
   role: "Software Engineer",
@@ -5,7 +7,7 @@ export const profile = {
   email: "muhammadbaqer_a@yahoo.com",
   linkedin: "https://www.linkedin.com/in/muhammadbager-al-ali/",
   github: "https://github.com/Muhammadbager",
-  resume: "/resume/Muhammadbager_Al-Ali_Resume.pdf",
+  resume: `${baseUrl}resume/Muhammadbager_Al-Ali_Resume.pdf`,
 };
 
 export const experience = [
@@ -56,7 +58,7 @@ export const projects = [
     tools: ["PyTorch", "Jupyter", "PINO", "Black–Scholes", "Yahoo Finance"],
     links: [
       { label: "Code", href: "https://github.com/hishambhatti/PINO-apps" },
-      { label: "Paper", href: "/research/PINO_Robustness_Paper.pdf" },
+      { label: "Paper", href: `${baseUrl}research/PINO_Robustness_Paper.pdf` },
     ],
   },
   {

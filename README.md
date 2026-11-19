@@ -1,4 +1,4 @@
-# Muhammadbager Al-Ali — Career Deck
+# Muhammadbager Al-Ali — Portfolio
 
 Public portfolio and private career dashboard for [Muhammadbager Al-Ali](https://github.com/Muhammadbager).
 
@@ -42,4 +42,5 @@ node scripts/job-watch.mjs
 
 ## Deployment
 
-Pushes to `main` build and deploy the site through GitHub Pages.
+Pushes to `main` build and deploy the site through GitHub Pages at
+`https://muhammadbager.github.io/portfolio/`.
